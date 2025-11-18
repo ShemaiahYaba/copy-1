@@ -2,10 +2,7 @@
 
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  CreateNotificationDto,
-  NotificationConfigDto,
-} from './dto';
+import { CreateNotificationDto, NotificationConfigDto } from './dto';
 import {
   INotification,
   NotificationType,
@@ -91,13 +88,9 @@ export class NotificationService {
    * Get notification history (if persistence enabled)
    * @param filters - Query filters
    */
-  async getHistory(
-    filters?: NotificationFilters,
-  ): Promise<INotification[]> {
+  async getHistory(filters?: NotificationFilters): Promise<INotification[]> {
     if (!this.config.persist) {
-      this.logger.warn(
-        'Persistence is disabled. History is not available.',
-      );
+      this.logger.warn('Persistence is disabled. History is not available.');
       return [];
     }
 
@@ -110,15 +103,11 @@ export class NotificationService {
       }
 
       if (filters.startDate) {
-        history = history.filter(
-          (n) => n.timestamp >= filters.startDate!,
-        );
+        history = history.filter((n) => n.timestamp >= filters.startDate!);
       }
 
       if (filters.endDate) {
-        history = history.filter(
-          (n) => n.timestamp <= filters.endDate!,
-        );
+        history = history.filter((n) => n.timestamp <= filters.endDate!);
       }
 
       if (filters.limit) {
@@ -158,7 +147,7 @@ export class NotificationService {
       try {
         // Store in memory (replace with actual DB save in production)
         this.notificationHistory.push(notification);
-        
+
         // Limit history size to prevent memory issues
         if (this.notificationHistory.length > 1000) {
           this.notificationHistory = this.notificationHistory.slice(-1000);
@@ -187,13 +176,17 @@ export class NotificationService {
    * Private method to notify all subscribers
    */
   private notifySubscribers(notification: INotification): void {
+    // Create a new object with the date properly preserved
+    const notificationWithDate = {
+      ...notification,
+      timestamp: new Date(notification.timestamp),
+    };
+
     this.subscribers.forEach((callback) => {
       try {
-        callback(notification);
+        callback(notificationWithDate);
       } catch (error) {
-        this.logger.error(
-          `Error in subscriber callback: ${error}`,
-        );
+        this.logger.error(`Error in subscriber callback: ${error}`);
       }
     });
   }
