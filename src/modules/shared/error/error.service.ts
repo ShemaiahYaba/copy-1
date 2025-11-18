@@ -1,0 +1,156 @@
+// ----------------------------------------------------------------------------
+// 8. ERROR SERVICE
+// src/modules/shared/error/error.service.ts
+// ----------------------------------------------------------------------------
+
+import { Injectable, Inject, Logger, HttpException } from '@nestjs/common';
+import { ErrorConfigDto } from './dto/error-config.dto';
+import { ErrorResponseDto } from './dto/error-response.dto';
+import { ErrorCode } from './constants/error-codes.constant';
+import { ErrorNotificationStrategy } from './dto/error-config.dto';
+import { ErrorSeverity } from './interfaces/error.interface';
+import { AppError } from './classes/app-error.class';
+import { ERROR_CODES } from './constants/error-codes.constant';
+
+@Injectable()
+export class ErrorService {
+  private readonly logger = new Logger(ErrorService.name);
+  private readonly sensitiveKeys = [
+    'password',
+    'token',
+    'apiKey',
+    'secret',
+    'creditCard',
+    'ssn',
+    'connectionString',
+    'authorization',
+    'cookie',
+  ];
+
+  constructor(
+    @Inject('ERROR_CONFIG')
+    private readonly config: ErrorConfigDto,
+  ) {}
+
+  processError(error: any, request?: any): ErrorResponseDto {
+    if (error instanceof AppError) {
+      return ErrorResponseDto.fromAppError(
+        error,
+        request,
+        this.config.includeStackTrace,
+      );
+    }
+
+    if (error instanceof HttpException) {
+      return new ErrorResponseDto({
+        code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+        message: error.message,
+        timestamp: new Date(),
+        path: request?.url,
+        method: request?.method,
+        stack: this.config.includeStackTrace ? error.stack : undefined,
+      });
+    }
+
+    return new ErrorResponseDto({
+      code: ERROR_CODES.UNKNOWN_ERROR,
+      message: error?.message || 'An unknown error occurred',
+      timestamp: new Date(),
+      path: request?.url,
+      method: request?.method,
+      stack: this.config.includeStackTrace ? error?.stack : undefined,
+    });
+  }
+
+  shouldNotify(error: AppError): boolean {
+    const { notificationStrategy } = this.config;
+
+    switch (notificationStrategy) {
+      case ErrorNotificationStrategy.ALL:
+        return true;
+      case ErrorNotificationStrategy.OPERATIONAL:
+        return error.isOperational;
+      case ErrorNotificationStrategy.CRITICAL:
+        return error.severity === ErrorSeverity.CRITICAL;
+      case ErrorNotificationStrategy.NONE:
+        return false;
+      default:
+        return false;
+    }
+  }
+
+  logError(error: any, context?: Record<string, any>): void {
+    if (!this.config.logErrors) return;
+
+    const sanitizedContext = this.sanitizeContext(context);
+
+    if (error instanceof AppError) {
+      const logLevel = this.getLogLevel(error.severity);
+      this.logger[logLevel](
+        `[${error.code}] ${error.message}`,
+        JSON.stringify(sanitizedContext),
+      );
+    } else {
+      this.logger.error(
+        error?.message || 'Unknown error',
+        error?.stack,
+        JSON.stringify(sanitizedContext),
+      );
+    }
+  }
+
+  async reportError(error: any, context?: Record<string, any>): Promise<void> {
+    if (!this.config.enableSentry) return;
+
+    try {
+      // Integration point for Sentry or other error tracking services
+      this.logger.debug(
+        `Would report to Sentry: ${error.message}`,
+        JSON.stringify(context),
+      );
+    } catch (reportError) {
+      this.logger.error(
+        'Failed to report error to external service',
+        reportError,
+      );
+    }
+  }
+
+  createError(
+    code: ErrorCode,
+    message?: string,
+    context?: Record<string, any>,
+  ): AppError {
+    return new AppError(code, message, context);
+  }
+
+  private sanitizeContext(context?: Record<string, any>): Record<string, any> {
+    if (!context) return {};
+
+    const sanitized = { ...context };
+
+    for (const key of this.sensitiveKeys) {
+      if (key in sanitized) {
+        sanitized[key] = '***REDACTED***';
+      }
+    }
+
+    return sanitized;
+  }
+
+  private getLogLevel(
+    severity: ErrorSeverity,
+  ): 'log' | 'warn' | 'error' | 'debug' {
+    switch (severity) {
+      case ErrorSeverity.LOW:
+        return 'log';
+      case ErrorSeverity.MEDIUM:
+        return 'warn';
+      case ErrorSeverity.HIGH:
+      case ErrorSeverity.CRITICAL:
+        return 'error';
+      default:
+        return 'log';
+    }
+  }
+}
