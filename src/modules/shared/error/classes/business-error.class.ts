@@ -17,6 +17,7 @@ export class BusinessError extends AppError {
       true,
     );
 
+    this.name = 'BusinessError'; // ← ensures stack trace shows class name
     Object.setPrototypeOf(this, BusinessError.prototype);
   }
 

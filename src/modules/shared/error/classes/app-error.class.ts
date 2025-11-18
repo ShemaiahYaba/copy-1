@@ -28,11 +28,13 @@ export class AppError extends Error implements IAppError {
     super(message || ERROR_MESSAGES[code]);
 
     this.code = code;
+    this.message = message ?? (ERROR_MESSAGES[code] || 'Unknown error');
     this.severity = severity;
     this.context = context;
     this.isOperational = isOperational;
     this.timestamp = new Date();
 
+    this.name = this.constructor.name;
     Error.captureStackTrace(this, this.constructor);
     Object.setPrototypeOf(this, AppError.prototype);
   }

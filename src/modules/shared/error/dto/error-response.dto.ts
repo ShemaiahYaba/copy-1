@@ -9,6 +9,7 @@ import { ERROR_CODES } from '../constants/error-codes.constant';
 import { AppError } from '../classes/app-error.class';
 
 export class ErrorResponseDto implements IErrorResponse {
+  [x: string]: any;
   status: 'error' = 'error';
   code: ErrorCode;
   message: string;

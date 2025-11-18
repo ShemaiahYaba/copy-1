@@ -104,9 +104,10 @@ export class ErrorService {
 
     try {
       // Integration point for Sentry or other error tracking services
+      const serializedContext = JSON.stringify(context ?? {});
       this.logger.debug(
         `Would report to Sentry: ${error.message}`,
-        JSON.stringify(context),
+        serializedContext,
       );
     } catch (reportError) {
       this.logger.error(
