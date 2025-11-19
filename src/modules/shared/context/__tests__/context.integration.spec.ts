@@ -6,8 +6,11 @@ import { INestApplication, Controller, Get } from '@nestjs/common';
 import request from 'supertest';
 import { ContextModule } from '../context.module';
 import { ContextService } from '../context.service';
-import { ContextStorageAdapter } from '../adapters/context-storage.adapter';
-import { UserIdSource } from '../dto/context-config.dto';
+import {
+  ContextStorageAdapter,
+  HeaderNamesDto,
+  UserIdSource,
+} from '../dto/context-config.dto';
 
 @Controller('test-context')
 class TestContextController {
@@ -59,6 +62,21 @@ describe('Context Integration (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it('SIMPLE: should have ClsService available', () => {
+    const contextService = app.get(ContextService);
+    expect(contextService).toBeDefined();
+
+    // Manually set context
+    contextService.setMeta({
+      userId: 'manual-user',
+      correlationId: 'manual-corr',
+      timestamp: new Date(),
+    });
+
+    const meta = contextService.getMeta();
+    console.log('Manually set context:', meta);
   });
 
   it('should receive context data from headers', () => {

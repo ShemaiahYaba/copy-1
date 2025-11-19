@@ -23,7 +23,7 @@ export enum UserIdSource {
   CUSTOM = 'custom', // Custom extraction logic
 }
 
-class HeaderNamesDto {
+export class HeaderNamesDto {
   @IsString()
   userId: string = 'x-user-id';
 
