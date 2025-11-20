@@ -11,6 +11,7 @@ import { ErrorNotificationStrategy } from './dto/error-config.dto';
 import { ErrorSeverity } from './interfaces/error.interface';
 import { AppError } from './classes/app-error.class';
 import { ERROR_CODES } from './constants/error-codes.constant';
+import * as Sentry from '@sentry/node';
 
 @Injectable()
 export class ErrorService {
@@ -99,24 +100,6 @@ export class ErrorService {
     }
   }
 
-  async reportError(error: any, context?: Record<string, any>): Promise<void> {
-    if (!this.config.enableSentry) return;
-
-    try {
-      // Integration point for Sentry or other error tracking services
-      const serializedContext = JSON.stringify(context ?? {});
-      this.logger.debug(
-        `Would report to Sentry: ${error.message}`,
-        serializedContext,
-      );
-    } catch (reportError) {
-      this.logger.error(
-        'Failed to report error to external service',
-        reportError,
-      );
-    }
-  }
-
   createError(
     code: ErrorCode,
     message?: string,
@@ -153,5 +136,37 @@ export class ErrorService {
       default:
         return 'log';
     }
+  }
+  async reportError(error: any, context?: Record<string, any>): Promise<void> {
+    if (!this.config.enableSentry) return;
+
+    try {
+      if (process.env.SENTRY_DSN) {
+        Sentry.captureException(error, {
+          extra: this.sanitizeContext(context),
+          level: this.getSentryLevel(error),
+        });
+      } else {
+        this.logger.debug('Sentry DSN not configured');
+      }
+    } catch (reportError) {
+      this.logger.error('Failed to report to Sentry', reportError);
+    }
+  }
+
+  private getSentryLevel(error: any): Sentry.SeverityLevel {
+    if (error instanceof AppError) {
+      switch (error.severity) {
+        case ErrorSeverity.LOW:
+          return 'info';
+        case ErrorSeverity.MEDIUM:
+          return 'warning';
+        case ErrorSeverity.HIGH:
+          return 'error';
+        case ErrorSeverity.CRITICAL:
+          return 'fatal';
+      }
+    }
+    return 'error';
   }
 }
