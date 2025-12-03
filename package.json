@@ -24,11 +24,15 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
     "@nestjs/graphql": "^13.2.0",
+    "@nestjs/jwt": "^11.0.1",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-socket.io": "^11.1.9",
     "@nestjs/swagger": "^11.2.2",
     "@nestjs/websockets": "^11.1.9",
+    "@sentry/node": "^10.26.0",
     "@types/socket.io-client": "^3.0.0",
+    "argon2": "^0.44.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "dotenv": "^17.2.3",
@@ -36,6 +40,8 @@
     "glob": "^11.0.3",
     "graphql-scalars": "^1.25.0",
     "nestjs-cls": "^6.1.0",
+    "node-appwrite": "^20.3.0",
+    "passport-jwt": "^4.0.1",
     "pg": "^8.16.3",
     "postgres": "^3.4.7",
     "reflect-metadata": "^0.2.2",
@@ -54,6 +60,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
+    "@types/passport-jwt": "^4.0.1",
     "@types/pg": "^8.15.5",
     "@types/socket.io": "^3.0.2",
     "@types/supertest": "^6.0.2",
@@ -74,22 +81,5 @@
     "tsx": "^4.20.6",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
   }
 }

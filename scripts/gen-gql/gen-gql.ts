@@ -5,6 +5,8 @@
  * -----------------------------------------
  * Usage:
  *    npx ts-node scripts/gen-gql.ts test1
+ *    npx ts-node scripts/gen-gql.ts admin/users
+ *    npx ts-node scripts/gen-gql.ts core/auth/providers
  *
  * Reads drizzle schemas in /models, generates GraphQL @ObjectType
  * classes into /entities AND @InputType DTOs into /dto for that module.
@@ -14,22 +16,26 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as glob from 'glob';
 
-const moduleName = process.argv[2];
-if (!moduleName) {
+const modulePath = process.argv[2];
+if (!modulePath) {
   console.error(
-    '❌ Please provide a module name. Example: npx ts-node scripts/gen-gql.ts user',
+    '❌ Please provide a module path. Examples:\n' +
+      '   npx ts-node scripts/gen-gql.ts user\n' +
+      '   npx ts-node scripts/gen-gql.ts admin/users\n' +
+      '   npx ts-node scripts/gen-gql.ts core/auth/providers',
   );
   process.exit(1);
 }
 
 const projectRoot = process.cwd();
-const modulePath = path.join(projectRoot, `src/modules/${moduleName}`);
-const modelsDir = path.join(modulePath, 'models');
-const entitiesDir = path.join(modulePath, 'entities');
-const dtoDir = path.join(modulePath, 'dto');
+const fullModulePath = path.join(projectRoot, `src/modules/${modulePath}`);
+const modelsDir = path.join(fullModulePath, 'models');
+const entitiesDir = path.join(fullModulePath, 'entities');
+const dtoDir = path.join(fullModulePath, 'dto');
 
 if (!fs.existsSync(modelsDir)) {
   console.error(`❌ Models folder not found: ${modelsDir}`);
+  console.error(`   Make sure the module path is correct: ${modulePath}`);
   process.exit(1);
 }
 
@@ -436,6 +442,7 @@ async function run() {
     return;
   }
 
+  console.log(`📦 Module path: ${modulePath}`);
   console.log(`📦 Found ${modelFiles.length} model file(s)`);
 
   for (const file of modelFiles) {
@@ -443,7 +450,7 @@ async function run() {
   }
 
   console.log(
-    `\n🎉 Done generating GraphQL entities and DTOs for module: ${moduleName}`,
+    `\n🎉 Done generating GraphQL entities and DTOs for module: ${modulePath}`,
   );
 }
 
