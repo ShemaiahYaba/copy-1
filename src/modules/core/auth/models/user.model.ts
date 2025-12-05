@@ -8,7 +8,6 @@ import {
   pgEnum,
   index,
   json,
-  text,
 } from 'drizzle-orm/pg-core';
 
 // ============================================================================
@@ -34,15 +33,14 @@ export const graduationStatusEnum = pgEnum('graduation_status', [
 ]);
 
 // ============================================================================
-// USERS TABLE (Synced with Appwrite)
+// USERS TABLE (Supabase Auth Integration)
 // ============================================================================
 
 export const users = pgTable(
   'users',
   {
-    // FIX: Changed from uuid to text to accept Appwrite IDs
-    id: text('id').primaryKey(), // Appwrite user ID (not a valid UUID format)
-    appwriteId: varchar('appwrite_id', { length: 255 }).notNull().unique(), // Appwrite user ID
+    // ✅ This ID comes from Supabase auth.users.id (UUID)
+    id: uuid('id').primaryKey(), // No defaultRandom() - Supabase provides this
     email: varchar('email', { length: 255 }).notNull().unique(),
     name: varchar('name', { length: 255 }),
     role: userRoleEnum('role').notNull(),
@@ -53,7 +51,6 @@ export const users = pgTable(
   },
   (table) => ({
     emailIdx: index('users_email_idx').on(table.email),
-    appwriteIdx: index('users_appwrite_idx').on(table.appwriteId),
     roleIdx: index('users_role_idx').on(table.role),
   }),
 );
@@ -66,8 +63,7 @@ export const clients = pgTable(
   'clients',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    // FIX: Changed from uuid to text to match users.id
-    userId: text('user_id')
+    userId: uuid('user_id') // ✅ UUID to match users.id
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull()
       .unique(),
@@ -90,8 +86,7 @@ export const universities = pgTable(
   'universities',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    // FIX: Changed from uuid to text to match users.id
-    userId: text('user_id')
+    userId: uuid('user_id') // ✅ UUID to match users.id
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull()
       .unique(),
@@ -118,8 +113,7 @@ export const supervisors = pgTable(
   'supervisors',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    // FIX: Changed from uuid to text to match users.id
-    userId: text('user_id')
+    userId: uuid('user_id') // ✅ FIXED: Changed from text to uuid
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull()
       .unique(),
@@ -147,8 +141,7 @@ export const students = pgTable(
   'students',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    // FIX: Changed from uuid to text to match users.id
-    userId: text('user_id')
+    userId: uuid('user_id') // ✅ FIXED: Changed from text to uuid
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull()
       .unique(),

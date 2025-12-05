@@ -3,7 +3,7 @@ CREATE TYPE "public"."graduation_status" AS ENUM('active', 'graduated', 'deferre
 CREATE TYPE "public"."user_role" AS ENUM('client', 'supervisor', 'student', 'university');--> statement-breakpoint
 CREATE TABLE "clients" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"user_id" text NOT NULL,
+	"user_id" uuid NOT NULL,
 	"organization_name" varchar(255) NOT NULL,
 	"industry" varchar(100),
 	"org_document_url" varchar(500),
@@ -14,7 +14,7 @@ CREATE TABLE "clients" (
 --> statement-breakpoint
 CREATE TABLE "students" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"user_id" text NOT NULL,
+	"user_id" uuid NOT NULL,
 	"matric_number" varchar(50) NOT NULL,
 	"graduation_status" "graduation_status" DEFAULT 'active' NOT NULL,
 	"supervisor_id" uuid,
@@ -27,7 +27,7 @@ CREATE TABLE "students" (
 --> statement-breakpoint
 CREATE TABLE "supervisors" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"user_id" text NOT NULL,
+	"user_id" uuid NOT NULL,
 	"university_id" uuid NOT NULL,
 	"employment_status" "employment_status" DEFAULT 'employed' NOT NULL,
 	"employment_document_url" varchar(500),
@@ -38,7 +38,7 @@ CREATE TABLE "supervisors" (
 --> statement-breakpoint
 CREATE TABLE "universities" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"user_id" text NOT NULL,
+	"user_id" uuid NOT NULL,
 	"name" varchar(255) NOT NULL,
 	"location" varchar(255),
 	"verification_document_url" varchar(500),
@@ -49,8 +49,7 @@ CREATE TABLE "universities" (
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
-	"id" text PRIMARY KEY NOT NULL,
-	"appwrite_id" varchar(255) NOT NULL,
+	"id" uuid PRIMARY KEY NOT NULL,
 	"email" varchar(255) NOT NULL,
 	"name" varchar(255),
 	"role" "user_role" NOT NULL,
@@ -58,7 +57,6 @@ CREATE TABLE "users" (
 	"email_verified" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "users_appwrite_id_unique" UNIQUE("appwrite_id"),
 	CONSTRAINT "users_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
@@ -77,5 +75,4 @@ CREATE INDEX "supervisors_university_idx" ON "supervisors" USING btree ("univers
 CREATE INDEX "universities_user_idx" ON "universities" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "universities_name_idx" ON "universities" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "users_email_idx" ON "users" USING btree ("email");--> statement-breakpoint
-CREATE INDEX "users_appwrite_idx" ON "users" USING btree ("appwrite_id");--> statement-breakpoint
 CREATE INDEX "users_role_idx" ON "users" USING btree ("role");

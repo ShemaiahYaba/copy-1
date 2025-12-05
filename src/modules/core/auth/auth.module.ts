@@ -5,23 +5,21 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
 // Services
-import { AppwriteService } from './services/appwrite.service';
+import { SupabaseService } from './services/supabase.service';
 import { UserService } from './services/user.service';
 
-// ✅ ADD THESE IMPORTS
 import { DatabaseModule } from '@database/database.module';
 import { ContextModule } from '@shared/context/context.module';
 import { NotificationModule } from '@shared/notification/notification.module';
 
 @Module({
   imports: [
-    // ✅ ADD THESE THREE LINES
     DatabaseModule,
     ContextModule.register(),
     NotificationModule.register(),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AppwriteService, UserService],
-  exports: [AuthService, AppwriteService, UserService],
+  providers: [AuthService, SupabaseService, UserService],
+  exports: [AuthService, SupabaseService, UserService],
 })
 export class AuthModule {}

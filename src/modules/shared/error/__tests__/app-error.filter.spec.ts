@@ -5,18 +5,18 @@
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
-import { AppErrorFilter } from '../../filters/app-error/app-error.filter';
-import { ErrorService } from '../../error.service';
+import { AppErrorFilter } from '@shared/error/filters/app-error/app-error.filter';
+import { ErrorService } from '@shared/error/error.service';
 import {
   ErrorConfigDto,
   ErrorNotificationStrategy,
-} from '../../dto/error-config.dto';
-import { AppError } from '../../classes/app-error.class';
-import { ValidationError } from '../../classes/validation-error.class';
-import { BusinessError } from '../../classes/business-error.class';
-import { ERROR_CODES } from '../../constants/error-codes.constant';
-import { ErrorSeverity } from '../../interfaces/error.interface';
-import { NotificationService } from '../../../notification/notification.service';
+} from '@shared/error/dto/error-config.dto';
+import { AppError } from '@shared/error/classes/app-error.class';
+import { ValidationError } from '@shared/error/classes/validation-error.class';
+import { BusinessError } from '@shared/error/classes/business-error.class';
+import { ERROR_CODES } from '@shared/error/constants/error-codes.constant';
+import { ErrorSeverity } from '@shared/error/interfaces/error.interface';
+import { NotificationService } from '@shared/notification/notification.service';
 
 describe('AppErrorFilter', () => {
   let filter: AppErrorFilter;

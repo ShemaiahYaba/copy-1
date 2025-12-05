@@ -1,12 +1,9 @@
 // src/modules/notification/__tests__/notification.service.spec.ts
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotificationService } from '../../shared/notification/notification.service';
-import {
-  NotificationConfigDto,
-  NotificationAdapter,
-} from '../../shared/notification/dto';
-import { NotificationType } from '../../shared/notification/interfaces';
+import { NotificationService } from '../notification.service';
+import { NotificationConfigDto, NotificationAdapter } from '../dto';
+import { NotificationType } from '../interfaces';
 
 describe('NotificationService', () => {
   let service: NotificationService;

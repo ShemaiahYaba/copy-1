@@ -1,5 +1,5 @@
 {
-  "id": "75ee67bf-893c-44dd-9ee2-a0ed29d424bf",
+  "id": "64fe65ae-9073-4fd2-9034-54c078475ba4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -17,7 +17,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -113,7 +113,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -267,7 +267,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -393,7 +393,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -504,14 +504,8 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": true,
-          "notNull": true
-        },
-        "appwrite_id": {
-          "name": "appwrite_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
           "notNull": true
         },
         "email": {
@@ -578,21 +572,6 @@
           "method": "btree",
           "with": {}
         },
-        "users_appwrite_idx": {
-          "name": "users_appwrite_idx",
-          "columns": [
-            {
-              "expression": "appwrite_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "users_role_idx": {
           "name": "users_role_idx",
           "columns": [
@@ -612,13 +591,6 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "users_appwrite_id_unique": {
-          "name": "users_appwrite_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "appwrite_id"
-          ]
-        },
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,

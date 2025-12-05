@@ -1,5 +1,6 @@
 // ----------------------------------------------------------------------------
-// REFACTORED — AppErrorFilter (Removed Redundancy)
+// REFACTORED — AppErrorFilter (With Sentry Integration)
+// src/modules/shared/error/filters/app-error/app-error.filter.ts
 // ----------------------------------------------------------------------------
 
 import {
@@ -12,6 +13,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
+import { SentryExceptionCaptured } from '@sentry/nestjs';
 
 import { AppError } from '../../classes/app-error.class';
 import { ErrorService } from '../../error.service';
@@ -32,6 +34,11 @@ export class AppErrorFilter implements ExceptionFilter {
     @Inject('ERROR_CONFIG') private readonly config: ErrorConfigDto,
   ) {}
 
+  /**
+   * Global exception handler with Sentry integration
+   * The @SentryExceptionCaptured() decorator automatically reports exceptions to Sentry
+   */
+  @SentryExceptionCaptured()
   catch(rawException: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();
@@ -64,7 +71,7 @@ export class AppErrorFilter implements ExceptionFilter {
       this.safeNotifyFrontend(errorResponse);
     }
 
-    // 📬 Report critical errors
+    // 📬 Report critical errors (Sentry reporting happens via decorator)
     if (shouldReport) {
       this.errorService.reportError(rawException, req).catch((err) => {
         this.logger.error('Failed to report critical error:', err);

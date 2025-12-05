@@ -1,6 +1,11 @@
 // src/modules/notification/notification.service.ts
 
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateNotificationDto, NotificationConfigDto } from './dto';
 import {
@@ -34,6 +39,9 @@ export class NotificationService {
    * @returns Created notification
    */
   async push(dto: CreateNotificationDto): Promise<INotification> {
+    if (!Object.values(NotificationType).includes(dto.type)) {
+      throw new BadRequestException(`Invalid notification type: ${dto.type}`);
+    }
     // Create notification with auto-generated fields
     const notification: INotification = {
       id: uuidv4(),

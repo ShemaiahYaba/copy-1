@@ -168,40 +168,66 @@ export class LoginDto {
 }
 
 // ============================================================================
-// SESSION DTO
+// SESSION DTO (UPDATED FOR SUPABASE)
 // ============================================================================
 
 export class SessionDto {
   @ApiProperty({
-    description: 'Appwrite session ID',
-    example: '5e5ea5c16897e',
+    description: 'JWT access token',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
-  sessionId: string;
+  accessToken: string;
 
   @ApiProperty({
-    description: 'User ID',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'Refresh token for obtaining new access tokens',
+    example: 'v1.MRjcAl-iNRhCfJECd...',
   })
-  userId: string;
+  refreshToken: string;
 
   @ApiProperty({
-    description: 'Session expiry timestamp',
-    example: '2025-11-30T12:00:00.000Z',
+    description: 'Token expiration timestamp (Unix time)',
+    example: 1703721600,
   })
-  expire: string;
+  expiresAt: number;
 }
 
 // ============================================================================
-// LOGOUT DTO
+// LOGOUT DTO (UPDATED)
 // ============================================================================
 
 export class LogoutDto {
   @ApiProperty({
-    description: 'Appwrite session ID',
-    example: '5e5ea5c16897e',
+    description: 'JWT access token to invalidate',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   @IsString()
-  sessionId: string;
+  accessToken: string;
+}
+
+// ============================================================================
+// VERIFY SESSION DTO (NEW)
+// ============================================================================
+
+export class VerifySessionDto {
+  @ApiProperty({
+    description: 'JWT access token to verify',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  })
+  @IsString()
+  accessToken: string;
+}
+
+// ============================================================================
+// REFRESH TOKEN DTO (NEW)
+// ============================================================================
+
+export class RefreshTokenDto {
+  @ApiProperty({
+    description: 'Refresh token',
+    example: 'v1.MRjcAl-iNRhCfJECd...',
+  })
+  @IsString()
+  refreshToken: string;
 }
 
 // ============================================================================
@@ -210,7 +236,7 @@ export class LogoutDto {
 
 export class UserResponseDto {
   @ApiProperty({
-    description: 'User ID',
+    description: 'User ID (Supabase UUID)',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   id: string;
@@ -321,4 +347,53 @@ export class LogoutResponseDto {
     example: 'Logged out successfully',
   })
   message: string;
+}
+
+// ============================================================================
+// TOKEN RESPONSE DTO (NEW)
+// ============================================================================
+
+export class TokenResponseDto {
+  @ApiProperty({
+    description: 'New JWT access token',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  })
+  accessToken: string;
+
+  @ApiProperty({
+    description: 'New refresh token',
+    example: 'v1.MRjcAl-iNRhCfJECd...',
+  })
+  refreshToken: string;
+
+  @ApiProperty({
+    description: 'Token expiration timestamp',
+    example: 1703721600,
+  })
+  expiresAt: number;
+}
+
+// ============================================================================
+// VERIFY SESSION RESPONSE DTO (NEW)
+// ============================================================================
+
+export class VerifySessionResponseDto {
+  @ApiProperty({ type: UserResponseDto })
+  user: UserResponseDto;
+
+  @ApiProperty({
+    description: 'Role-specific profile',
+    oneOf: [
+      { $ref: '#/components/schemas/ClientProfileDto' },
+      { $ref: '#/components/schemas/SupervisorProfileDto' },
+      { $ref: '#/components/schemas/StudentProfileDto' },
+      { $ref: '#/components/schemas/UniversityProfileDto' },
+    ],
+    required: false,
+  })
+  profile?:
+    | ClientProfileDto
+    | SupervisorProfileDto
+    | StudentProfileDto
+    | UniversityProfileDto;
 }

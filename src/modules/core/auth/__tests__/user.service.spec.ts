@@ -13,7 +13,6 @@ import {
   universities,
 } from '../models/user.model';
 import { AppError } from '@shared/error/classes/app-error.class';
-import { ERROR_CODES } from '@shared/error/constants/error-codes.constant';
 
 // Test data
 const mockUser = {

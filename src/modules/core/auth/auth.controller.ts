@@ -1,4 +1,4 @@
-// src/modules/auth/auth.controller.ts
+// src/modules/core/auth/auth.controller.ts
 import { Controller, Post, Body, HttpCode, Headers } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
@@ -16,9 +16,12 @@ import {
   RegisterUniversityDto,
   LoginDto,
   LogoutDto,
+  VerifySessionDto,
+  RefreshTokenDto,
   AuthResponseDto,
   LogoutResponseDto,
-  SessionDto,
+  TokenResponseDto,
+  VerifySessionResponseDto,
 } from './dto/register.dto';
 
 @ApiTags('auth')
@@ -81,7 +84,7 @@ export class AuthController {
   @HttpCode(200)
   @ApiCustom({
     summary: 'Logout user',
-    description: 'Invalidate Appwrite session and end user session',
+    description: 'Invalidate Supabase session and end user session',
     successStatus: 200,
     body: LogoutDto,
     responseType: LogoutResponseDto,
@@ -91,42 +94,41 @@ export class AuthController {
     @Body() dto: LogoutDto,
     @Headers('x-user-id') userId?: string,
   ): Promise<LogoutResponseDto> {
-    await this.authService.logout(dto.sessionId, userId);
+    await this.authService.logout(dto.accessToken, userId);
     return { message: 'Logged out successfully' };
   }
 
   // ==========================================================================
-  // SESSION VERIFICATION
+  // SESSION & TOKEN MANAGEMENT
   // ==========================================================================
 
   @Post('verify-session')
   @HttpCode(200)
   @ApiCustom({
     summary: 'Verify session',
-    description: 'Verify Appwrite session and return user data',
+    description: 'Verify JWT access token and return user data',
     successStatus: 200,
+    body: VerifySessionDto,
+    responseType: VerifySessionResponseDto,
     auth: false,
   })
   async verifySession(
-    @Body() dto: { sessionId: string },
-  ): Promise<{ user: any; session: SessionDto }> {
-    return this.authService.verifySession(dto.sessionId);
+    @Body() dto: VerifySessionDto,
+  ): Promise<VerifySessionResponseDto> {
+    return this.authService.verifySession(dto.accessToken);
   }
 
-  @Post('session')
+  @Post('refresh')
   @HttpCode(200)
   @ApiCustom({
-    summary: 'Get session details',
-    description: 'Get current Appwrite session details',
+    summary: 'Refresh access token',
+    description: 'Get new access token using refresh token',
     successStatus: 200,
+    body: RefreshTokenDto,
+    responseType: TokenResponseDto,
     auth: false,
   })
-  async getSession(@Body() dto: { sessionId: string }): Promise<SessionDto> {
-    const session = await this.authService.getCurrentSession(dto.sessionId);
-    return {
-      sessionId: session.$id,
-      userId: session.userId,
-      expire: session.expire,
-    };
+  async refreshToken(@Body() dto: RefreshTokenDto): Promise<TokenResponseDto> {
+    return this.authService.refreshToken(dto.refreshToken);
   }
 }

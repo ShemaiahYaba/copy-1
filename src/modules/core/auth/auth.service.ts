@@ -1,4 +1,4 @@
-// src/modules/auth/auth.service.ts
+// src/modules/core/auth/auth.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { ERROR_CODES } from '@shared/error/constants/error-codes.constant';
@@ -7,7 +7,7 @@ import { ContextService } from '@shared/context/context.service';
 import { NotificationService } from '@shared/notification/notification.service';
 import { NotificationType } from '@shared/notification/interfaces';
 
-import { AppwriteService } from './services/appwrite.service';
+import { SupabaseService } from './services/supabase.service';
 import { UserService } from './services/user.service';
 
 import {
@@ -20,12 +20,24 @@ import {
   UserResponseDto,
 } from './dto/register.dto';
 
+// Type for profile responses
+type ProfileResponse =
+  | { id: string; organizationName: string; industry?: string }
+  | { id: string; universityId: string; employmentStatus: string }
+  | {
+      id: string;
+      matricNumber: string;
+      graduationStatus: string;
+      skills?: string[];
+    }
+  | { id: string; name: string; location?: string; isVerified: boolean };
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
-    private appwriteService: AppwriteService,
+    private supabaseService: SupabaseService,
     private userService: UserService,
     private contextService: ContextService,
     private notificationService: NotificationService,
@@ -50,28 +62,31 @@ export class AuthService {
     }
 
     try {
-      // Create Appwrite account
-      const appwriteUser = await this.appwriteService.createAccount(
+      // 1. Create user in Supabase Auth
+      const supabaseUser = await this.supabaseService.createUser(
         dto.email,
         dto.password,
-        dto.organizationName,
+        { name: dto.organizationName },
       );
 
-      // Create session in Appwrite
-      const session = await this.appwriteService.createEmailSession(
+      // 2. Create session (login the user)
+      const { session } = await this.supabaseService.signInWithPassword(
         dto.email,
         dto.password,
       );
 
-      // Create user + client profile in our database
+      if (!session) {
+        throw new Error('Failed to create session after registration');
+      }
+
+      // 3. Create user + client profile in our database
       const { user, client } = await this.userService.createClient(
         {
-          id: appwriteUser.$id,
-          appwriteId: appwriteUser.$id,
+          id: supabaseUser.id,
           email: dto.email,
           name: dto.organizationName,
           role: 'client',
-          emailVerified: appwriteUser.emailVerification,
+          emailVerified: supabaseUser.email_confirmed_at !== null,
         },
         {
           organizationName: dto.organizationName,
@@ -80,7 +95,7 @@ export class AuthService {
         },
       );
 
-      // Populate context
+      // 4. Populate context
       this.contextService.setMeta({
         userId: user.id,
         username: user.name || user.email.split('@')[0],
@@ -90,7 +105,7 @@ export class AuthService {
         timestamp: new Date(),
       });
 
-      // Send success notification
+      // 5. Send success notification
       await this.notificationService.push({
         type: NotificationType.SUCCESS,
         message: 'Account created successfully! Welcome to Gradlinq.',
@@ -99,12 +114,13 @@ export class AuthService {
 
       this.logger.log(`Client registered: ${user.email}`);
 
+      // 6. Return response
       return {
         user: this.mapUserResponse(user),
         session: {
-          sessionId: session.$id,
-          userId: session.userId,
-          expire: session.expire,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt: session.expires_at!,
         },
         profile: {
           id: client.id,
@@ -112,23 +128,9 @@ export class AuthService {
           industry: client.industry || undefined,
         },
       };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Client registration failed:', error);
-
-      // Handle Appwrite-specific errors
-      if (error.code === 409) {
-        throw new AppError(
-          ERROR_CODES.ALREADY_EXISTS,
-          'Email already registered in authentication system',
-          { email: dto.email },
-        );
-      }
-
-      throw new AppError(
-        ERROR_CODES.INTERNAL_SERVER_ERROR,
-        'Registration failed',
-        { error: error.message },
-      );
+      throw this.handleSupabaseError(error, 'Registration failed');
     }
   }
 
@@ -148,23 +150,29 @@ export class AuthService {
     }
 
     try {
-      const appwriteUser = await this.appwriteService.createAccount(
+      // 1. Create user in Supabase Auth
+      const supabaseUser = await this.supabaseService.createUser(
         dto.email,
         dto.password,
       );
 
-      const session = await this.appwriteService.createEmailSession(
+      // 2. Create session
+      const { session } = await this.supabaseService.signInWithPassword(
         dto.email,
         dto.password,
       );
 
+      if (!session) {
+        throw new Error('Failed to create session after registration');
+      }
+
+      // 3. Create user + supervisor profile in our database
       const { user, supervisor } = await this.userService.createSupervisor(
         {
-          id: appwriteUser.$id,
-          appwriteId: appwriteUser.$id,
+          id: supabaseUser.id,
           email: dto.email,
           role: 'supervisor',
-          emailVerified: appwriteUser.emailVerification,
+          emailVerified: supabaseUser.email_confirmed_at !== null,
         },
         {
           universityId: dto.universityId,
@@ -172,6 +180,7 @@ export class AuthService {
         },
       );
 
+      // 4. Populate context
       this.contextService.setMeta({
         userId: user.id,
         email: user.email,
@@ -180,6 +189,7 @@ export class AuthService {
         timestamp: new Date(),
       });
 
+      // 5. Send notification
       await this.notificationService.push({
         type: NotificationType.SUCCESS,
         message: 'Supervisor account created successfully!',
@@ -191,9 +201,9 @@ export class AuthService {
       return {
         user: this.mapUserResponse(user),
         session: {
-          sessionId: session.$id,
-          userId: session.userId,
-          expire: session.expire,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt: session.expires_at!,
         },
         profile: {
           id: supervisor.id,
@@ -201,13 +211,9 @@ export class AuthService {
           employmentStatus: supervisor.employmentStatus,
         },
       };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Supervisor registration failed:', error);
-      // FIX: Re-throw AppError instances directly
-      if (error instanceof AppError) {
-        throw error;
-      }
-      throw this.handleAppwriteError(error, 'Registration failed');
+      throw this.handleSupabaseError(error, 'Registration failed');
     }
   }
 
@@ -225,25 +231,31 @@ export class AuthService {
     }
 
     try {
-      const appwriteUser = await this.appwriteService.createAccount(
+      // 1. Create user in Supabase Auth
+      const supabaseUser = await this.supabaseService.createUser(
         dto.email,
         dto.password,
-        dto.matricNumber,
+        { name: dto.matricNumber },
       );
 
-      const session = await this.appwriteService.createEmailSession(
+      // 2. Create session
+      const { session } = await this.supabaseService.signInWithPassword(
         dto.email,
         dto.password,
       );
 
+      if (!session) {
+        throw new Error('Failed to create session after registration');
+      }
+
+      // 3. Create user + student profile
       const { user, student } = await this.userService.createStudent(
         {
-          id: appwriteUser.$id,
-          appwriteId: appwriteUser.$id,
+          id: supabaseUser.id,
           email: dto.email,
           name: dto.matricNumber,
           role: 'student',
-          emailVerified: appwriteUser.emailVerification,
+          emailVerified: supabaseUser.email_confirmed_at !== null,
         },
         {
           matricNumber: dto.matricNumber,
@@ -251,6 +263,7 @@ export class AuthService {
         },
       );
 
+      // 4. Populate context
       this.contextService.setMeta({
         userId: user.id,
         email: user.email,
@@ -258,6 +271,7 @@ export class AuthService {
         timestamp: new Date(),
       });
 
+      // 5. Send notification
       await this.notificationService.push({
         type: NotificationType.SUCCESS,
         message:
@@ -270,9 +284,9 @@ export class AuthService {
       return {
         user: this.mapUserResponse(user),
         session: {
-          sessionId: session.$id,
-          userId: session.userId,
-          expire: session.expire,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt: session.expires_at!,
         },
         profile: {
           id: student.id,
@@ -281,9 +295,9 @@ export class AuthService {
           skills: student.skills || undefined,
         },
       };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Student registration failed:', error);
-      throw this.handleAppwriteError(error, 'Registration failed');
+      throw this.handleSupabaseError(error, 'Registration failed');
     }
   }
 
@@ -303,25 +317,31 @@ export class AuthService {
     }
 
     try {
-      const appwriteUser = await this.appwriteService.createAccount(
+      // 1. Create user in Supabase Auth
+      const supabaseUser = await this.supabaseService.createUser(
         dto.email,
         dto.password,
-        dto.name,
+        { name: dto.name },
       );
 
-      const session = await this.appwriteService.createEmailSession(
+      // 2. Create session
+      const { session } = await this.supabaseService.signInWithPassword(
         dto.email,
         dto.password,
       );
 
+      if (!session) {
+        throw new Error('Failed to create session after registration');
+      }
+
+      // 3. Create user + university profile
       const { user, university } = await this.userService.createUniversity(
         {
-          id: appwriteUser.$id,
-          appwriteId: appwriteUser.$id,
+          id: supabaseUser.id,
           email: dto.email,
           name: dto.name,
           role: 'university',
-          emailVerified: appwriteUser.emailVerification,
+          emailVerified: supabaseUser.email_confirmed_at !== null,
         },
         {
           name: dto.name,
@@ -330,6 +350,7 @@ export class AuthService {
         },
       );
 
+      // 4. Populate context
       this.contextService.setMeta({
         userId: user.id,
         email: user.email,
@@ -338,6 +359,7 @@ export class AuthService {
         timestamp: new Date(),
       });
 
+      // 5. Send notification
       await this.notificationService.push({
         type: NotificationType.SUCCESS,
         message: 'University account created successfully!',
@@ -349,9 +371,9 @@ export class AuthService {
       return {
         user: this.mapUserResponse(user),
         session: {
-          sessionId: session.$id,
-          userId: session.userId,
-          expire: session.expire,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt: session.expires_at!,
         },
         profile: {
           id: university.id,
@@ -360,9 +382,9 @@ export class AuthService {
           isVerified: university.isVerified,
         },
       };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('University registration failed:', error);
-      throw this.handleAppwriteError(error, 'Registration failed');
+      throw this.handleSupabaseError(error, 'Registration failed');
     }
   }
 
@@ -375,27 +397,27 @@ export class AuthService {
    */
   async login(dto: LoginDto): Promise<AuthResponseDto> {
     try {
-      // Create Appwrite session
-      const session = await this.appwriteService.createEmailSession(
-        dto.email,
-        dto.password,
-      );
+      // 1. Authenticate with Supabase
+      const { session, user: supabaseUser } =
+        await this.supabaseService.signInWithPassword(dto.email, dto.password);
 
-      // Find user in our database
-      let user = await this.userService.findByAppwriteId(session.userId);
+      if (!session || !supabaseUser) {
+        throw new Error('Invalid credentials');
+      }
+
+      // 2. Find user in our database
+      const user = await this.userService.findById(supabaseUser.id);
 
       if (!user) {
-        // User exists in Appwrite but not in our DB (shouldn't happen)
         throw new AppError(
           ERROR_CODES.RESOURCE_NOT_FOUND,
           'User profile not found',
-          { appwriteId: session.userId },
+          { supabaseId: supabaseUser.id },
         );
       }
 
-      // Check if account is active
+      // 3. Check if account is active
       if (!user.isActive) {
-        await this.appwriteService.deleteSession(session.$id);
         throw new AppError(
           ERROR_CODES.OPERATION_NOT_ALLOWED,
           'Account is inactive',
@@ -403,11 +425,11 @@ export class AuthService {
         );
       }
 
-      // Get user profile
+      // 4. Get user profile
       const { profile } = await this.userService.getUserWithProfile(user.id);
       const orgId = this.getOrgId(user.role, profile);
 
-      // Populate context
+      // 5. Populate context
       this.contextService.setMeta({
         userId: user.id,
         username: user.name || user.email.split('@')[0],
@@ -417,7 +439,7 @@ export class AuthService {
         timestamp: new Date(),
       });
 
-      // Send welcome notification
+      // 6. Send welcome notification
       await this.notificationService.push({
         type: NotificationType.SUCCESS,
         message: `Welcome back, ${user.email}!`,
@@ -433,13 +455,13 @@ export class AuthService {
       return {
         user: this.mapUserResponse(user),
         session: {
-          sessionId: session.$id,
-          userId: session.userId,
-          expire: session.expire,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt: session.expires_at!,
         },
         profile: this.mapProfile(user.role, profile),
       };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Login failed:', error);
 
       await this.notificationService.push({
@@ -463,9 +485,9 @@ export class AuthService {
   /**
    * Logout user
    */
-  async logout(sessionId: string, userId?: string): Promise<void> {
+  async logout(accessToken: string, userId?: string): Promise<void> {
     try {
-      await this.appwriteService.deleteSession(sessionId);
+      await this.supabaseService.signOut(accessToken);
 
       if (userId) {
         await this.notificationService.push({
@@ -483,15 +505,31 @@ export class AuthService {
   }
 
   /**
-   * Get current session
+   * Refresh access token
    */
-  async getCurrentSession(sessionId: string) {
+  async refreshToken(refreshToken: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: number;
+  }> {
     try {
-      return await this.appwriteService.getSession(sessionId);
+      const { session } =
+        await this.supabaseService.refreshSession(refreshToken);
+
+      if (!session) {
+        throw new Error('Failed to refresh session');
+      }
+
+      return {
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+        expiresAt: session.expires_at!,
+      };
     } catch (error) {
+      this.logger.error('Token refresh failed:', error);
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
-        'Invalid or expired session',
+        'Invalid or expired refresh token',
       );
     }
   }
@@ -499,21 +537,34 @@ export class AuthService {
   /**
    * Verify session and get user
    */
-  async verifySession(sessionId: string): Promise<any> {
+  async verifySession(accessToken: string): Promise<{
+    user: UserResponseDto;
+    profile: ProfileResponse | undefined;
+  }> {
     try {
-      const session = await this.appwriteService.getSession(sessionId);
-      const user = await this.userService.findByAppwriteId(session.userId);
+      // 1. Verify token with Supabase
+      const supabaseUser = await this.supabaseService.verifyToken(accessToken);
+
+      // 2. Get user from our database
+      const user = await this.userService.findById(supabaseUser.id);
 
       if (!user) {
         throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'User not found');
       }
 
-      return { user, session };
+      // 3. Get profile
+      const { profile } = await this.userService.getUserWithProfile(user.id);
+
+      return {
+        user: this.mapUserResponse(user),
+        profile: this.mapProfile(user.role, profile),
+      };
     } catch (error) {
       if (error instanceof AppError) {
-        // Let our custom errors pass through
         throw error;
       }
+
+      this.logger.error('Session verification failed:', error);
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
         'Invalid or expired session',
@@ -525,39 +576,66 @@ export class AuthService {
   // HELPER METHODS
   // ==========================================================================
 
-  private handleAppwriteError(error: any, defaultMessage: string): AppError {
-    if (error.code === 409) {
+  private handleSupabaseError(
+    error: unknown,
+    defaultMessage: string,
+  ): AppError {
+    const err = error as Error & { message?: string };
+
+    if (err.message?.includes('already registered')) {
       return new AppError(
         ERROR_CODES.ALREADY_EXISTS,
         'Email already registered',
       );
     }
 
-    if (error.code === 401) {
+    if (err.message?.includes('Invalid login credentials')) {
       return new AppError(
         ERROR_CODES.INVALID_CREDENTIALS,
         'Invalid credentials',
       );
     }
 
+    if (err.message?.includes('Email not confirmed')) {
+      return new AppError(
+        ERROR_CODES.OPERATION_NOT_ALLOWED,
+        'Email not confirmed',
+      );
+    }
+
+    if (error instanceof AppError) {
+      return error;
+    }
+
     return new AppError(ERROR_CODES.INTERNAL_SERVER_ERROR, defaultMessage, {
-      error: error.message,
+      error: err.message || 'Unknown error',
     });
   }
 
-  private getOrgId(role: string, profile: any): string | undefined {
+  private getOrgId(
+    role: string,
+    profile: { id: string; universityId?: string } | undefined,
+  ): string | undefined {
+    if (!profile) return undefined;
+
     switch (role) {
       case 'client':
-        return profile?.id;
+        return profile.id;
       case 'supervisor':
       case 'university':
-        return profile?.universityId || profile?.id;
+        return profile.universityId || profile.id;
       default:
         return undefined;
     }
   }
 
-  private mapUserResponse(user: any): UserResponseDto {
+  private mapUserResponse(user: {
+    id: string;
+    email: string;
+    role: string;
+    isActive: boolean;
+    createdAt: Date;
+  }): UserResponseDto {
     return {
       id: user.id,
       email: user.email,
@@ -567,38 +645,55 @@ export class AuthService {
     };
   }
 
-  private mapProfile(role: string, profile: any): any {
+  private mapProfile(
+    role: string,
+    profile:
+      | {
+          id: string;
+          organizationName?: string;
+          industry?: string | null;
+          universityId?: string;
+          employmentStatus?: string;
+          matricNumber?: string;
+          graduationStatus?: string;
+          skills?: string[] | null;
+          name?: string;
+          location?: string | null;
+          isVerified?: boolean;
+        }
+      | undefined,
+  ): ProfileResponse | undefined {
     if (!profile) return undefined;
 
     switch (role) {
       case 'client':
         return {
           id: profile.id,
-          organizationName: profile.organizationName,
-          industry: profile.industry,
+          organizationName: profile.organizationName || '',
+          industry: profile.industry || undefined,
         };
       case 'supervisor':
         return {
           id: profile.id,
-          universityId: profile.universityId,
-          employmentStatus: profile.employmentStatus,
+          universityId: profile.universityId || '',
+          employmentStatus: profile.employmentStatus || 'pending',
         };
       case 'student':
         return {
           id: profile.id,
-          matricNumber: profile.matricNumber,
-          graduationStatus: profile.graduationStatus,
-          skills: profile.skills,
+          matricNumber: profile.matricNumber || '',
+          graduationStatus: profile.graduationStatus || 'undergraduate',
+          skills: profile.skills || undefined,
         };
       case 'university':
         return {
           id: profile.id,
-          name: profile.name,
-          location: profile.location,
-          isVerified: profile.isVerified,
+          name: profile.name || '',
+          location: profile.location || undefined,
+          isVerified: profile.isVerified || false,
         };
       default:
-        return profile;
+        return undefined;
     }
   }
 }
