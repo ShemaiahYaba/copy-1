@@ -8,6 +8,7 @@ import {
 } from '@modules/api-docs/api-docs.decorator';
 
 import { AuthService } from './auth.service';
+import { Public } from './decorators/public.decorator'; // ✅ IMPORT THIS
 
 import {
   RegisterClientDto,
@@ -34,6 +35,7 @@ export class AuthController {
   // ==========================================================================
 
   @Post('register/client')
+  @Public() // ✅ ADDED - Bypass JwtAuthGuard
   @ApiCreate('client', RegisterClientDto, AuthResponseDto, { auth: false })
   async registerClient(
     @Body() dto: RegisterClientDto,
@@ -42,6 +44,7 @@ export class AuthController {
   }
 
   @Post('register/supervisor')
+  @Public() // ✅ ADDED
   @ApiCreate('supervisor', RegisterSupervisorDto, AuthResponseDto, {
     auth: false,
   })
@@ -52,6 +55,7 @@ export class AuthController {
   }
 
   @Post('register/student')
+  @Public() // ✅ ADDED
   @ApiCreate('student', RegisterStudentDto, AuthResponseDto, { auth: false })
   async registerStudent(
     @Body() dto: RegisterStudentDto,
@@ -60,6 +64,7 @@ export class AuthController {
   }
 
   @Post('register/university')
+  @Public() // ✅ ADDED
   @ApiCreate('university', RegisterUniversityDto, AuthResponseDto, {
     auth: false,
   })
@@ -74,6 +79,7 @@ export class AuthController {
   // ==========================================================================
 
   @Post('login')
+  @Public() // ✅ ADDED
   @HttpCode(200)
   @ApiLogin(LoginDto, AuthResponseDto)
   async login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
@@ -81,6 +87,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @Public() // ✅ ADDED (logout doesn't need auth in most systems)
   @HttpCode(200)
   @ApiCustom({
     summary: 'Logout user',
@@ -103,6 +110,7 @@ export class AuthController {
   // ==========================================================================
 
   @Post('verify-session')
+  @Public() // ✅ ADDED (verification endpoint should be public)
   @HttpCode(200)
   @ApiCustom({
     summary: 'Verify session',
@@ -119,6 +127,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Public() // ✅ ADDED (refresh endpoint should be public)
   @HttpCode(200)
   @ApiCustom({
     summary: 'Refresh access token',
