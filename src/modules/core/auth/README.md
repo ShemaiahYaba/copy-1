@@ -1,19 +1,18 @@
-# Authentication Module (Appwrite Integration)
+# Authentication Module
 
-Production-ready authentication system for Gradlinq using **Appwrite** as the authentication backend. Supports 4 user types (Client, Supervisor, Student, University) with seamless integration with Context, Notification, and Error modules.
+Enterprise-grade, type-safe authentication system for NestJS applications using **Supabase Auth**. Built with comprehensive guards, decorators, and seamless integration with Context, Notification, and Error modules.
 
 ## 📋 Table of Contents
 
 - [Features](#features)
 - [Architecture](#architecture)
 - [Installation](#installation)
-- [Appwrite Setup](#appwrite-setup)
 - [Quick Start](#quick-start)
+- [Type Safety](#type-safety)
 - [API Endpoints](#api-endpoints)
-- [Authentication Flow](#authentication-flow)
-- [Session Management](#session-management)
+- [Guards & Decorators](#guards--decorators)
+- [Usage Examples](#usage-examples)
 - [Integration](#integration)
-- [Frontend Integration](#frontend-integration)
 - [Security](#security)
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
@@ -22,26 +21,39 @@ Production-ready authentication system for Gradlinq using **Appwrite** as the au
 
 ## ✨ Features
 
-- **Appwrite Backend**: Leverages Appwrite for secure authentication
-- **4 User Types**: Client, Supervisor, Student, University with role-specific profiles
-- **Session Management**: Appwrite sessions with automatic expiry
-- **Email/Password Auth**: Secure authentication with Appwrite's built-in security
-- **Context Integration**: Auto-populate ContextService on login
-- **Real-time Notifications**: Success/error notifications for auth events
-- **Comprehensive Error Handling**: Standardized errors with AppError
-- **Full API Documentation**: Swagger/OpenAPI documentation
-- **No JWT Management**: Appwrite handles all token/session management
+### Core Authentication
+
+- **Supabase Auth Backend** - Leverages Supabase's battle-tested authentication
+- **JWT Token Management** - Access tokens + refresh tokens with automatic validation
+- **4 User Roles** - Client, Supervisor, Student, University with role-specific profiles
+- **Session Management** - Secure session handling with token refresh
+- **Type-Safe Throughout** - Full TypeScript support with runtime type safety
+
+### Developer Experience
+
+- **No Passport.js Required** - Simple, direct implementation
+- **Type-Safe Guards** - `@CurrentUser()` decorator with full type inference
+- **Role-Based Access Control** - `@Roles()` decorator for fine-grained permissions
+- **Public Routes** - `@Public()` decorator to bypass authentication
+- **Comprehensive Testing** - Unit and integration tests included
+
+### Integrations
+
+- **Context Service** - Auto-populate user context on login
+- **Notification Service** - Real-time auth event notifications
+- **Error Handling** - Standardized errors with `AppError`
+- **API Documentation** - Full Swagger/OpenAPI support
 
 ---
 
 ## 🏗️ Architecture
 
-### How It Works
+### Authentication Flow
 
 ```
 ┌─────────────┐         ┌─────────────┐         ┌─────────────┐
-│   Frontend  │ ──────> │   NestJS    │ ──────> │  Appwrite   │
-│             │         │   Backend   │         │   Backend   │
+│   Frontend  │ ──────> │   NestJS    │ ──────> │  Supabase   │
+│             │  Token  │   Backend   │   JWT   │    Auth     │
 └─────────────┘         └─────────────┘         └─────────────┘
                               │
                               ▼
@@ -51,26 +63,24 @@ Production-ready authentication system for Gradlinq using **Appwrite** as the au
                         └─────────────┘
 ```
 
-### Data Flow
+### Key Components
 
-1. **Registration**:
-   - User → NestJS → Create Appwrite account
-   - Appwrite → Returns user + session
-   - NestJS → Store user profile in PostgreSQL
-   - NestJS → Return session to frontend
+```
+auth/
+├── decorators/           # @CurrentUser(), @Roles(), @Public()
+├── guards/              # JwtAuthGuard, RolesGuard
+├── services/            # SupabaseService, UserService
+├── models/              # Database schemas (Drizzle ORM)
+├── dto/                 # Request/Response DTOs
+└── interfaces/          # TypeScript interfaces
+```
 
-2. **Login**:
-   - User → NestJS → Authenticate with Appwrite
-   - Appwrite → Returns session
-   - NestJS → Fetch profile from PostgreSQL
-   - NestJS → Populate Context, send notification
-   - NestJS → Return session + profile
+### How It Works
 
-3. **Protected Routes**:
-   - Frontend → Sends sessionId in header
-   - NestJS → Verify session with Appwrite
-   - NestJS → Fetch user from PostgreSQL
-   - NestJS → Process request
+1. **Registration**: Create Supabase user → Create local profile → Return tokens
+2. **Login**: Verify with Supabase → Fetch profile → Populate context → Return tokens
+3. **Protected Routes**: Extract token → Verify with Supabase → Fetch user → Attach to request
+4. **Role Checks**: Read `@Roles()` metadata → Validate user role → Allow/Deny access
 
 ---
 
@@ -79,16 +89,18 @@ Production-ready authentication system for Gradlinq using **Appwrite** as the au
 ### 1. Install Dependencies
 
 ```bash
-pnpm add node-appwrite
+pnpm add @supabase/supabase-js
+pnpm add -D @types/node
 ```
 
 ### 2. Set Environment Variables
 
 ```bash
 # .env
-APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
-APPWRITE_PROJECT_ID=your-project-id-here
-APPWRITE_API_KEY=your-api-key-here
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_ANON_KEY=your-anon-key
+FRONTEND_URL=http://localhost:3000
 
 DATABASE_URL=postgresql://user:pass@localhost:5432/gradlinq
 ```
@@ -107,7 +119,7 @@ pnpm drizzle-kit migrate
 
 ```typescript
 // src/app.module.ts
-import { AuthModule } from './modules/auth/auth.module';
+import { AuthModule } from './modules/core/auth/auth.module';
 
 @Module({
   imports: [
@@ -120,48 +132,6 @@ import { AuthModule } from './modules/auth/auth.module';
 })
 export class AppModule {}
 ```
-
----
-
-## 🚀 Appwrite Setup
-
-### 1. Create Appwrite Project
-
-1. Go to [Appwrite Console](https://cloud.appwrite.io/console)
-2. Create new project: **"Gradlinq"**
-3. Copy Project ID
-
-### 2. Enable Email/Password Auth
-
-1. Navigate to **Auth** → **Settings**
-2. Enable **Email/Password** authentication
-3. Configure session limits and security settings
-
-### 3. Create API Key
-
-1. Navigate to **Overview** → **API Keys**
-2. Create new API key with these scopes:
-   - `users.read`
-   - `users.write`
-   - `sessions.read`
-   - `sessions.write`
-3. Copy the API key
-
-### 4. Configure CORS (for frontend)
-
-1. Navigate to **Settings** → **Platforms**
-2. Add Web Platform
-3. Add your frontend URLs:
-   - `http://localhost:3000` (development)
-   - `https://yourdomain.com` (production)
-
-### 5. Optional: Configure Email Templates
-
-1. Navigate to **Auth** → **Templates**
-2. Customize email templates for:
-   - Email verification
-   - Password recovery
-   - Magic URL login
 
 ---
 
@@ -189,12 +159,12 @@ curl -X POST http://localhost:3000/auth/register/client \
     "email": "john@company.com",
     "role": "client",
     "isActive": true,
-    "createdAt": "2025-11-23T12:00:00Z"
+    "createdAt": "2025-12-08T12:00:00Z"
   },
   "session": {
-    "sessionId": "5e5ea5c16897e",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "expire": "2025-11-30T12:00:00.000Z"
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "v1.MRjcAl-iNRhCfJECd...",
+    "expiresAt": 1703721600
   },
   "profile": {
     "id": "client-123",
@@ -215,14 +185,64 @@ curl -X POST http://localhost:3000/auth/login \
   }'
 ```
 
-### Logout
+### Make Authenticated Request
 
 ```bash
-curl -X POST http://localhost:3000/auth/logout \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sessionId": "5e5ea5c16897e"
-  }'
+curl -X GET http://localhost:3000/projects \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+---
+
+## 🛡️ Type Safety
+
+This module provides **complete type safety** throughout your application.
+
+### Type-Safe Request.user
+
+```typescript
+import { Controller, Get } from '@nestjs/common';
+import { CurrentUser } from '@modules/auth/decorators';
+import { User } from '@modules/auth/models/user.model';
+
+@Controller('profile')
+export class ProfileController {
+  // ✅ Full type inference
+  @Get()
+  async getProfile(@CurrentUser() user: User) {
+    // TypeScript knows all properties exist
+    console.log(user.id); // string
+    console.log(user.email); // string
+    console.log(user.role); // 'client' | 'supervisor' | 'student' | 'university'
+    console.log(user.isActive); // boolean
+
+    return user;
+  }
+
+  // ✅ Extract specific property
+  @Get('email')
+  async getEmail(@CurrentUser('email') email: string) {
+    return { email };
+  }
+}
+```
+
+### Type-Safe Role Checks
+
+```typescript
+import { hasRole, isActiveUser } from '@modules/auth/interfaces/auth.interface';
+
+async updateProject(user: User) {
+  // ✅ Type-safe role checking
+  if (!hasRole(user, ['client', 'supervisor'])) {
+    throw new ForbiddenException();
+  }
+
+  // ✅ Type-safe status checking
+  if (!isActiveUser(user)) {
+    throw new ForbiddenException('Account inactive');
+  }
+}
 ```
 
 ---
@@ -239,103 +259,230 @@ curl -X POST http://localhost:3000/auth/logout \
 | POST   | `/auth/register/university` | Register new university |
 | POST   | `/auth/login`               | Login (all user types)  |
 | POST   | `/auth/logout`              | Logout user             |
-| POST   | `/auth/verify-session`      | Verify session validity |
-| POST   | `/auth/session`             | Get session details     |
+| POST   | `/auth/verify-session`      | Verify JWT token        |
+| POST   | `/auth/refresh`             | Refresh access token    |
 
 ---
 
-## 🔐 Authentication Flow
+## 🛡️ Guards & Decorators
 
-### Registration Flow
+### Guards
 
-```
-User submits registration
-    ↓
-Validate email uniqueness (local DB)
-    ↓
-Create Appwrite account
-    ↓
-Create Appwrite session (auto-login)
-    ↓
-Create user + role-specific profile (PostgreSQL)
-    ↓
-Populate ContextService
-    ↓
-Send success notification
-    ↓
-Return user + session + profile
-```
+#### JwtAuthGuard
 
-### Login Flow
+Validates JWT tokens and attaches user to request.
 
-```
-User submits email + password
-    ↓
-Authenticate with Appwrite
-    ↓
-Appwrite validates credentials
-    ↓
-Appwrite creates session
-    ↓
-Fetch user profile (PostgreSQL)
-    ↓
-Check account is active
-    ↓
-Populate ContextService
-    ↓
-Send welcome notification
-    ↓
-Return user + session + profile
+```typescript
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '@modules/auth/guards';
+
+@Controller('projects')
+@UseGuards(JwtAuthGuard) // ✅ Protect all routes
+export class ProjectController {
+  @Get()
+  async getProjects(@CurrentUser() user: User) {
+    // user is guaranteed to exist here
+    return this.projectService.getProjectsForUser(user.id);
+  }
+}
 ```
 
-### Session Verification Flow
+#### RolesGuard
 
+Enforces role-based access control.
+
+```typescript
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard, RolesGuard } from '@modules/auth/guards';
+import { Roles } from '@modules/auth/decorators';
+
+@Controller('admin')
+@UseGuards(JwtAuthGuard, RolesGuard) // ✅ Apply both guards
+export class AdminController {
+  @Get('dashboard')
+  @Roles('university', 'supervisor') // ✅ Only these roles
+  async getDashboard() {
+    return { message: 'Admin dashboard' };
+  }
+}
 ```
-Frontend sends sessionId
-    ↓
-Verify session with Appwrite
-    ↓
-Fetch user from PostgreSQL
-    ↓
-Return user data
+
+### Decorators
+
+#### @CurrentUser()
+
+Extract authenticated user from request.
+
+```typescript
+// Get full user object
+@Get('profile')
+async getProfile(@CurrentUser() user: User) {
+  return user;
+}
+
+// Get specific property
+@Get('email')
+async getEmail(@CurrentUser('email') email: string) {
+  return { email };
+}
+
+// Get user ID
+@Post('create')
+async create(
+  @CurrentUser('id') userId: string,
+  @Body() dto: CreateDto,
+) {
+  return this.service.create(userId, dto);
+}
+```
+
+#### @Roles()
+
+Restrict route access to specific roles.
+
+```typescript
+// Single role
+@Post('create-project')
+@Roles('client')
+async createProject() { }
+
+// Multiple roles
+@Get('dashboard')
+@Roles('university', 'supervisor')
+async getDashboard() { }
+```
+
+#### @Public()
+
+Mark routes as public (bypass authentication).
+
+```typescript
+@Post('login')
+@Public()
+async login(@Body() dto: LoginDto) {
+  return this.authService.login(dto);
+}
 ```
 
 ---
 
-## 🎫 Session Management
+## 💡 Usage Examples
 
-### How Sessions Work
-
-- **Appwrite manages all sessions** (no manual JWT handling)
-- Sessions are **automatically created** on login/registration
-- Sessions have **configurable expiry** (default: 1 year)
-- Sessions can be **invalidated** on logout
-- **Multiple sessions** supported (multi-device login)
-
-### Session Storage
-
-Frontend should store the `sessionId` returned from login:
+### Example 1: Basic Protected Controller
 
 ```typescript
-// Store session
-localStorage.setItem('sessionId', session.sessionId);
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '@modules/auth/guards';
+import { CurrentUser } from '@modules/auth/decorators';
+import { User } from '@modules/auth/models/user.model';
 
-// Include in requests
-const response = await fetch('/api/protected-route', {
-  headers: {
-    'X-Session-Id': localStorage.getItem('sessionId'),
-  },
-});
+@Controller('projects')
+@UseGuards(JwtAuthGuard)
+export class ProjectController {
+  constructor(private projectService: ProjectService) {}
+
+  @Get()
+  async getProjects(@CurrentUser() user: User) {
+    return this.projectService.getProjectsForUser(user.id);
+  }
+
+  @Post()
+  async createProject(
+    @Body() dto: CreateProjectDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.projectService.create(dto, user.id);
+  }
+}
 ```
 
-### Session Validation
-
-Backend validates session with Appwrite:
+### Example 2: Role-Based Access Control
 
 ```typescript
-// In your middleware/guard
-const session = await appwriteService.getSession(sessionId);
-// If valid, continue. If invalid/expired, throw 401
+import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard, RolesGuard } from '@modules/auth/guards';
+import { Roles, CurrentUser } from '@modules/auth/decorators';
+import { User } from '@modules/auth/models/user.model';
+
+@Controller('admin')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class AdminController {
+  // Only clients can access
+  @Get('clients')
+  @Roles('client')
+  async getClients() {
+    return this.adminService.getClients();
+  }
+
+  // Multiple roles allowed
+  @Get('dashboard')
+  @Roles('university', 'supervisor')
+  async getDashboard(@CurrentUser() user: User) {
+    return this.adminService.getDashboard(user.role);
+  }
+}
+```
+
+### Example 3: Service Layer with Type Guards
+
+```typescript
+import { Injectable, ForbiddenException } from '@nestjs/common';
+import { User } from '@modules/auth/models/user.model';
+import { hasRole, isActiveUser } from '@modules/auth/interfaces/auth.interface';
+
+@Injectable()
+export class ProjectService {
+  async createProject(dto: CreateProjectDto, user: User) {
+    // ✅ Type-safe role check
+    if (!hasRole(user, ['client'])) {
+      throw new ForbiddenException('Only clients can create projects');
+    }
+
+    // ✅ Type-safe active check
+    if (!isActiveUser(user)) {
+      throw new ForbiddenException('Account is inactive');
+    }
+
+    // TypeScript knows user.id exists and is string
+    return this.projectRepo.save({
+      ...dto,
+      createdBy: user.id,
+    });
+  }
+}
+```
+
+### Example 4: Mixed Public/Protected Routes
+
+```typescript
+import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Public, CurrentUser } from '@modules/auth/decorators';
+import { JwtAuthGuard } from '@modules/auth/guards';
+import { User } from '@modules/auth/models/user.model';
+
+@Controller('articles')
+@UseGuards(JwtAuthGuard) // Default: all routes protected
+export class ArticleController {
+  // Public route - anyone can access
+  @Get()
+  @Public()
+  async getArticles() {
+    return this.articleService.getPublicArticles();
+  }
+
+  // Protected route - requires authentication
+  @Get('my-articles')
+  async getMyArticles(@CurrentUser() user: User) {
+    return this.articleService.getArticlesForUser(user.id);
+  }
+
+  // Public route
+  @Get(':id')
+  @Public()
+  async getArticle(@Param('id') id: string) {
+    return this.articleService.getArticle(id);
+  }
+}
 ```
 
 ---
@@ -348,17 +495,20 @@ Auth automatically populates `ContextService` on login:
 
 ```typescript
 // After login, context is populated
-this.contextService.getUserId(); // ✅ Returns user ID
-this.contextService.getOrgId(); // ✅ Returns org/university ID
-
-// Use in any service
 @Injectable()
 export class ProjectService {
   constructor(private contextService: ContextService) {}
 
   async createProject(dto: CreateProjectDto) {
-    const userId = this.contextService.getUserId();
-    return this.projectRepo.save({ ...dto, createdBy: userId });
+    const userId = this.contextService.getUserId(); // ✅ Available
+    const email = this.contextService.get('email'); // ✅ Available
+    const orgId = this.contextService.getOrgId(); // ✅ Available
+
+    return this.projectRepo.save({
+      ...dto,
+      createdBy: userId,
+      organizationId: orgId,
+    });
   }
 }
 ```
@@ -379,97 +529,32 @@ NotificationType.ERROR: "Login failed. Please check your credentials."
 
 // Logout
 NotificationType.INFO: "You have been logged out successfully."
+
+// Access denied
+NotificationType.ERROR: "Access denied. Insufficient permissions."
 ```
 
----
+### Error Module
 
-## 💻 Frontend Integration
-
-### React Example
+Auth uses standardized errors:
 
 ```typescript
-import { useState } from 'react';
+// Invalid credentials
+throw new AppError(
+  ERROR_CODES.INVALID_CREDENTIALS,
+  'Invalid email or password',
+  { email: dto.email },
+);
 
-function AuthProvider({ children }) {
-  const [session, setSession] = useState(null);
+// Insufficient permissions
+throw new AppError(ERROR_CODES.INSUFFICIENT_PERMISSIONS, 'Access denied', {
+  requiredRoles: ['admin'],
+  userRole: user.role,
+});
 
-  async function register(email, password, organizationName, role = 'client') {
-    const response = await fetch(`/api/auth/register/${role}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, organizationName }),
-    });
-
-    const data = await response.json();
-
-    // Store session
-    localStorage.setItem('sessionId', data.session.sessionId);
-    setSession(data.session);
-
-    return data;
-  }
-
-  async function login(email, password) {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await response.json();
-    localStorage.setItem('sessionId', data.session.sessionId);
-    setSession(data.session);
-
-    return data;
-  }
-
-  async function logout() {
-    const sessionId = localStorage.getItem('sessionId');
-
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId }),
-    });
-
-    localStorage.removeItem('sessionId');
-    setSession(null);
-  }
-
-  async function verifySession() {
-    const sessionId = localStorage.getItem('sessionId');
-    if (!sessionId) return null;
-
-    const response = await fetch('/api/auth/verify-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId }),
-    });
-
-    if (response.ok) {
-      return await response.json();
-    }
-
-    return null;
-  }
-
-  return (
-    <AuthContext.Provider value={{ session, register, login, logout, verifySession }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-```
-
-### Making Authenticated Requests
-
-```typescript
-// Include sessionId in headers
-const response = await fetch('/api/projects', {
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Session-Id': localStorage.getItem('sessionId'),
-  },
+// Account inactive
+throw new AppError(ERROR_CODES.OPERATION_NOT_ALLOWED, 'Account is inactive', {
+  userId: user.id,
 });
 ```
 
@@ -477,16 +562,27 @@ const response = await fetch('/api/projects', {
 
 ## 🔒 Security
 
-### Appwrite Security Features
+### Built-in Security Features
 
-- ✅ **Argon2** password hashing (built-in)
-- ✅ **Rate limiting** on auth endpoints
-- ✅ **Session management** with automatic expiry
-- ✅ **HTTPS-only** in production
-- ✅ **CORS protection**
-- ✅ **IP whitelisting** (optional)
+- ✅ **Bcrypt Password Hashing** (Supabase handles this)
+- ✅ **JWT Token Validation** with expiry
+- ✅ **Refresh Token Rotation**
+- ✅ **Session Management** with automatic cleanup
+- ✅ **Role-Based Access Control**
+- ✅ **Account Activation** checks
+- ✅ **Rate Limiting** (via Supabase)
 
 ### Password Requirements
+
+```typescript
+// Enforced in DTOs
+@Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+  message: 'Password must contain uppercase, lowercase, number, and special character',
+})
+password: string;
+```
+
+**Requirements:**
 
 - Minimum 8 characters
 - At least 1 uppercase letter
@@ -498,38 +594,70 @@ const response = await fetch('/api/projects', {
 
 ### Best Practices
 
-1. ✅ **Store sessionId securely** (httpOnly cookies recommended)
-2. ✅ **Validate session on each request**
-3. ✅ **Use HTTPS** in production
-4. ✅ **Enable Appwrite security features** (rate limiting, etc.)
-5. ✅ **Implement CORS** properly
-6. ✅ **Monitor failed login attempts**
-7. ✅ **Rotate sessions** periodically
+1. ✅ **Always use HTTPS** in production
+2. ✅ **Store tokens securely** (httpOnly cookies recommended)
+3. ✅ **Implement token refresh** before expiry
+4. ✅ **Validate tokens on every request** (handled by guard)
+5. ✅ **Use role-based access control** with `@Roles()`
+6. ✅ **Enable Supabase security features** (rate limiting, etc.)
+7. ✅ **Monitor failed login attempts**
+8. ✅ **Implement account lockout** after N failed attempts
 
 ---
 
 ## 🧪 Testing
 
-### Environment Setup
+### Unit Tests
 
 ```bash
-# Test environment
-APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
-APPWRITE_PROJECT_ID=test-project-id
-APPWRITE_API_KEY=test-api-key
+# Test auth service
+pnpm test auth.service.spec.ts
+
+# Test Supabase service
+pnpm test supabase.service.spec.ts
+
+# Test user service
+pnpm test user.service.spec.ts
 ```
 
-### Run Tests
+### Integration Tests
 
 ```bash
-# All auth tests
-pnpm test auth
+# Run all integration tests
+pnpm test auth.integration.spec.ts
 
 # With coverage
 pnpm test -- --coverage auth
+```
 
-# Integration tests
-pnpm test auth.integration.spec.ts
+### Test Examples
+
+```typescript
+describe('AuthService', () => {
+  it('should register new client', async () => {
+    const dto = {
+      email: 'test@company.com',
+      password: 'SecurePass123!',
+      organizationName: 'Test Corp',
+    };
+
+    const result = await authService.registerClient(dto);
+
+    expect(result.user.email).toBe(dto.email);
+    expect(result.user.role).toBe('client');
+    expect(result.session.accessToken).toBeDefined();
+  });
+
+  it('should login with valid credentials', async () => {
+    const result = await authService.login({
+      email: 'test@company.com',
+      password: 'SecurePass123!',
+    });
+
+    expect(result.user).toBeDefined();
+    expect(result.session).toBeDefined();
+  });
+});
 ```
 
 ---
@@ -538,80 +666,130 @@ pnpm test auth.integration.spec.ts
 
 ### Common Issues
 
-#### 1. "Appwrite Error: User already exists"
+#### 1. "User already exists"
 
-**Cause**: Email already registered in Appwrite
+**Cause**: Email already registered in Supabase
 
-**Solution**: Use different email or check Appwrite console
+**Solution**:
 
-#### 2. "Invalid session"
-
-**Cause**: Session expired or invalidated
-
-**Solution**: Login again to get new session
-
-#### 3. "Appwrite connection failed"
-
-**Cause**: Wrong endpoint or project ID
-
-**Solution**: Verify environment variables
-
-```bash
-APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1  # Correct endpoint
-APPWRITE_PROJECT_ID=your-actual-project-id
+```typescript
+// Check if user exists before registration
+const existing = await userService.findByEmail(dto.email);
+if (existing) {
+  throw new AppError(ERROR_CODES.ALREADY_EXISTS, 'Email already exists');
+}
 ```
 
-#### 4. "CORS error"
+#### 2. "Invalid or expired token"
 
-**Cause**: Frontend URL not whitelisted in Appwrite
+**Cause**: JWT token expired or invalid
 
-**Solution**: Add frontend URL in Appwrite Console → Platforms
+**Solution**:
 
-#### 5. "User profile not found"
+```typescript
+// Implement token refresh
+const refreshToken = localStorage.getItem('refreshToken');
+const { accessToken } = await fetch('/auth/refresh', {
+  method: 'POST',
+  body: JSON.stringify({ refreshToken }),
+});
+localStorage.setItem('accessToken', accessToken);
+```
 
-**Cause**: User exists in Appwrite but not in PostgreSQL
+#### 3. "Supabase connection failed"
 
-**Solution**: This shouldn't happen. Check transaction rollback logs.
+**Cause**: Wrong environment variables
+
+**Solution**:
+
+```bash
+# Verify .env file
+SUPABASE_URL=https://your-project.supabase.co  # Must include https://
+SUPABASE_SERVICE_ROLE_KEY=eyJhb...            # Service role key, not anon key
+```
+
+#### 4. "User not found in database"
+
+**Cause**: User exists in Supabase but not in local database
+
+**Solution**:
+
+```typescript
+// This shouldn't happen due to transactions
+// If it does, check transaction rollback logs
+// Ensure createUser and database insert are in same transaction
+```
+
+#### 5. "Access denied" / "Insufficient permissions"
+
+**Cause**: User doesn't have required role
+
+**Solution**:
+
+```typescript
+// Check user role
+console.log('User role:', user.role);
+console.log('Required roles:', ['admin', 'client']);
+
+// Verify @Roles() decorator is correct
+@Roles('client', 'supervisor') // ✅ Multiple roles
+async createProject() { }
+```
 
 ### Debug Logging
 
-Enable Appwrite debug logs:
+Enable debug logging in `JwtAuthGuard`:
 
 ```typescript
-// In appwrite.service.ts
-this.client.setEndpoint(endpoint).setProject(projectId);
+// guards/jwt-auth.guard.ts
+this.logger.debug(`User authenticated: ${user.email} (${user.role})`);
+```
 
-// Add debug logging
-this.logger.debug(`Appwrite initialized: ${endpoint}, Project: ${projectId}`);
+Enable Supabase logging:
+
+```typescript
+// services/supabase.service.ts
+this.logger.log(`User signed in: ${email}`);
+this.logger.error('Sign in failed:', error);
 ```
 
 ---
 
-## 🔮 Future Enhancements
+## 📊 Comparison: Supabase vs Passport.js
 
-- [ ] OAuth2 login (Google, GitHub, etc.) - Appwrite supports this
-- [ ] Two-factor authentication - Appwrite supports this
-- [ ] Email verification - Appwrite supports this
-- [ ] Password reset - Appwrite supports this
-- [ ] Magic URL login - Appwrite supports this
-- [ ] Phone authentication - Appwrite supports this
-- [ ] Anonymous sessions - Appwrite supports this
+| Feature            | This Module (Supabase) | Passport.js           |
+| ------------------ | ---------------------- | --------------------- |
+| Setup Complexity   | ✅ Simple              | ❌ Complex            |
+| JWT Validation     | ✅ Built-in            | ❌ Manual             |
+| Token Refresh      | ✅ Automatic           | ❌ Manual             |
+| Password Hashing   | ✅ Built-in            | ❌ Manual (bcrypt)    |
+| Session Management | ✅ Built-in            | ❌ Manual             |
+| Rate Limiting      | ✅ Built-in            | ❌ Manual             |
+| Email Verification | ✅ Built-in            | ❌ Manual             |
+| Password Reset     | ✅ Built-in            | ❌ Manual             |
+| OAuth2 Support     | ✅ Built-in            | ✅ With strategies    |
+| Type Safety        | ✅ Full TypeScript     | ⚠️ Partial            |
+| Testing            | ✅ Easy to mock        | ⚠️ Complex strategies |
 
 ---
 
-## 📊 Appwrite vs Custom JWT
+## 🎯 Key Benefits
 
-| Feature            | Appwrite             | Custom JWT               |
-| ------------------ | -------------------- | ------------------------ |
-| Password Hashing   | ✅ Built-in (Argon2) | ❌ Manual implementation |
-| Session Management | ✅ Automatic         | ❌ Manual implementation |
-| Rate Limiting      | ✅ Built-in          | ❌ Manual implementation |
-| Email Verification | ✅ Built-in          | ❌ Manual implementation |
-| Password Reset     | ✅ Built-in          | ❌ Manual implementation |
-| OAuth2             | ✅ Built-in          | ❌ Manual implementation |
-| 2FA                | ✅ Built-in          | ❌ Manual implementation |
-| Multi-device       | ✅ Built-in          | ❌ Manual implementation |
-| Security Updates   | ✅ Automatic         | ❌ Manual                |
+### For Developers
+
+- **No Passport Configuration** - Direct, simple implementation
+- **Full Type Safety** - TypeScript throughout the stack
+- **Easy Testing** - Mock services, not strategies
+- **Clear Errors** - Standardized error handling
+- **Familiar Decorators** - `@CurrentUser()`, `@Roles()`, `@Public()`
+
+### For Applications
+
+- **Production Ready** - Battle-tested Supabase backend
+- **Scalable** - Handles millions of users
+- **Secure** - Industry-standard JWT + bcrypt
+- **Fast** - Minimal overhead, direct validation
+- **Maintainable** - Clean, readable code
 
 ---
 
@@ -621,6 +799,6 @@ MIT License
 
 ---
 
-**Module Version**: 2.0.0 (Appwrite)  
-**Last Updated**: November 23, 2025  
+**Module Version**: 2.0.0 (Supabase)  
+**Last Updated**: December 08, 2025  
 **Status**: Production Ready ✅
