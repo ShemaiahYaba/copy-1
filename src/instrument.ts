@@ -1,9 +1,6 @@
-// ----------------------------------------------------------------------------
-// SENTRY INITIALIZATION
-// src/instrument.ts
-// ----------------------------------------------------------------------------
-// IMPORTANT: This file must be imported first in main.ts
-// ----------------------------------------------------------------------------
+// ============================================================================
+// FIX 1: src/instrument.ts - Remove invalid 'tracing' option
+// ============================================================================
 
 import * as Sentry from '@sentry/nestjs';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
@@ -21,7 +18,6 @@ Sentry.init({
   profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
 
   // Send default PII (Personal Identifiable Information)
-  // Set to false if you need to comply with strict privacy regulations
   sendDefaultPii: false,
 
   // Integrations
@@ -29,9 +25,10 @@ Sentry.init({
     // Add profiling integration
     nodeProfilingIntegration(),
 
-    // HTTP integration for tracking HTTP requests
+    // ✅ FIXED: Remove 'tracing' option - it's deprecated
+    // The tracing is now controlled by tracesSampleRate above
     Sentry.httpIntegration({
-      tracing: true,
+      // breadcrumbs: true, // Optional: track HTTP requests as breadcrumbs
     }),
 
     // Node.js context for additional context
@@ -75,15 +72,10 @@ Sentry.init({
 
   // Ignore certain errors
   ignoreErrors: [
-    // Browser errors (if you're also using frontend Sentry)
     'Non-Error exception captured',
     'Non-Error promise rejection captured',
-
-    // Network errors
     'Network request failed',
     'Failed to fetch',
-
-    // Common non-critical errors
     'ResizeObserver loop limit exceeded',
   ],
 

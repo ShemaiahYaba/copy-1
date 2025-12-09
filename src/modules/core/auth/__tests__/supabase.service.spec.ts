@@ -4,7 +4,10 @@ import { Logger } from '@nestjs/common';
 import { SupabaseService } from '../services/supabase.service';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 
-// Mock the entire supabase-js module
+// ============================================================================
+// MOCK SETUP
+// ============================================================================
+
 jest.mock('@supabase/supabase-js', () => ({
   createClient: jest.fn(),
 }));
@@ -13,74 +16,130 @@ const mockCreateClient = createClient as jest.MockedFunction<
   typeof createClient
 >;
 
+// ============================================================================
+// MOCK FACTORIES
+// ============================================================================
+
+/**
+ * Factory to create a mock Supabase User
+ */
+const createMockUser = (overrides?: Partial<User>): User => ({
+  id: 'test-user-id',
+  email: 'test@example.com',
+  user_metadata: { name: 'Test User' },
+  app_metadata: {},
+  aud: 'authenticated',
+  confirmed_at: new Date().toISOString(),
+  created_at: new Date().toISOString(),
+  email_confirmed_at: new Date().toISOString(),
+  last_sign_in_at: new Date().toISOString(),
+  phone: '',
+  role: 'authenticated',
+  updated_at: new Date().toISOString(),
+  ...overrides,
+});
+
+/**
+ * Factory to create a mock Supabase success response
+ */
+const createSuccessResponse = <T>(data: T) => ({
+  data,
+  error: null,
+});
+
+/**
+ * Factory to create a mock Supabase error response
+ */
+const createErrorResponse = (message: string, code = '400') => ({
+  data: { user: null },
+  error: { message, code },
+});
+
+/**
+ * Factory to create a mock Supabase session
+ */
+const createMockSession = (user: User, overrides?: any) => ({
+  access_token: 'test-access-token',
+  refresh_token: 'test-refresh-token',
+  user,
+  ...overrides,
+});
+
+/**
+ * Factory to create a complete mock Supabase client
+ */
+const createMockSupabaseClient = (): jest.Mocked<
+  SupabaseClient<any, any, any, any>
+> =>
+  ({
+    auth: {
+      admin: {
+        createUser: jest.fn(),
+        deleteUser: jest.fn(),
+        updateUserById: jest.fn(),
+      },
+      signInWithPassword: jest.fn(),
+      signOut: jest.fn(),
+      getUser: jest.fn(),
+      refreshSession: jest.fn(),
+      resetPasswordForEmail: jest.fn(),
+      resend: jest.fn(),
+    },
+  }) as jest.Mocked<SupabaseClient<any, any, any, any>>;
+
+/**
+ * Setup test environment with standard configuration
+ */
+const setupTestEnvironment = () => {
+  process.env.SUPABASE_URL = 'https://test.supabase.co';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key';
+  process.env.SUPABASE_ANON_KEY = 'test-anon-key';
+  process.env.FRONTEND_URL = 'https://test-frontend.com';
+};
+
+// ============================================================================
+// TEST SUITE
+// ============================================================================
+
 describe('SupabaseService', () => {
   let service: SupabaseService;
-  let mockSupabaseClient: jest.Mocked<SupabaseClient<any, any, any, any>>; // Use the generic client type
+  let mockSupabaseClient: jest.Mocked<SupabaseClient<any, any, any, any>>;
   let mockUser: User;
 
-  const mockUserId = 'test-user-id';
-  const mockEmail = 'test@example.com';
-  const mockPassword = 'test-password';
-  const mockAccessToken = 'test-access-token';
-  const mockRefreshToken = 'test-refresh-token';
+  // Test data constants
+  const TEST_USER_ID = 'test-user-id';
+  const TEST_EMAIL = 'test@example.com';
+  const TEST_PASSWORD = 'test-password';
+  const TEST_ACCESS_TOKEN = 'test-access-token';
+  const TEST_REFRESH_TOKEN = 'test-refresh-token';
 
   beforeEach(async () => {
-    // Set up environment variables
-    process.env.SUPABASE_URL = 'https://test.supabase.co';
-    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key';
-    process.env.SUPABASE_ANON_KEY = 'test-anon-key';
-    process.env.FRONTEND_URL = 'https://test-frontend.com';
+    // Setup environment
+    setupTestEnvironment();
 
     // Create mock objects
-    mockUser = {
-      id: mockUserId,
-      email: mockEmail,
-      user_metadata: { name: 'Test User' },
-      app_metadata: {},
-      aud: 'authenticated',
-      confirmed_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      email_confirmed_at: new Date().toISOString(),
-      last_sign_in_at: new Date().toISOString(),
-      phone: '',
-      role: 'authenticated',
-      updated_at: new Date().toISOString(),
-    };
+    mockUser = createMockUser();
+    mockSupabaseClient = createMockSupabaseClient();
 
-    // Mock the Supabase client and its auth/admin methods
-    mockSupabaseClient = {
-      auth: {
-        admin: {
-          createUser: jest.fn(),
-          deleteUser: jest.fn(),
-          updateUserById: jest.fn(),
-        },
-        signInWithPassword: jest.fn(),
-        signOut: jest.fn(),
-        getUser: jest.fn(),
-        refreshSession: jest.fn(),
-        resetPasswordForEmail: jest.fn(),
-        resend: jest.fn(),
-        // Add other auth methods as needed, e.g., signUp, signOut, etc.
-      },
-      // Add other client methods if your service uses them (e.g., from, rpc)
-      // For now, we'll just mock the auth part as that's what the service uses
-    } as jest.Mocked<SupabaseClient<any, any, any, any>>;
-
-    // Mock the createClient function to return our mocked client
+    // Mock the createClient function
     mockCreateClient.mockReturnValue(mockSupabaseClient);
 
+    // Create testing module
     const module: TestingModule = await Test.createTestingModule({
       providers: [SupabaseService],
     }).compile();
 
     service = module.get<SupabaseService>(SupabaseService);
-    service.onModuleInit(); // Initialize the service to set up the client
+    service.onModuleInit();
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
+
+  // ==========================================================================
+  // INITIALIZATION TESTS
+  // ==========================================================================
 
   describe('Initialization', () => {
     it('should be defined', () => {
@@ -120,218 +179,185 @@ describe('SupabaseService', () => {
     });
   });
 
+  // ==========================================================================
+  // CREATE USER TESTS
+  // ==========================================================================
+
   describe('createUser', () => {
     it('should create a user successfully', async () => {
-      const mockResponse = {
-        data: { user: mockUser },
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.admin.createUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createSuccessResponse({ user: mockUser });
+      mockSupabaseClient.auth.admin.createUser.mockResolvedValue(mockResponse);
 
-      const result = await service.createUser(mockEmail, mockPassword, {
+      const result = await service.createUser(TEST_EMAIL, TEST_PASSWORD, {
         name: 'Test User',
       });
 
       expect(mockSupabaseClient.auth.admin.createUser).toHaveBeenCalledWith({
-        email: mockEmail,
-        password: mockPassword,
+        email: TEST_EMAIL,
+        password: TEST_PASSWORD,
         user_metadata: { name: 'Test User' },
       });
       expect(result).toEqual(mockUser);
     });
 
     it('should create a user with empty metadata when not provided', async () => {
-      const mockResponse = {
-        data: { user: mockUser },
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.admin.createUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createSuccessResponse({ user: mockUser });
+      mockSupabaseClient.auth.admin.createUser.mockResolvedValue(mockResponse);
 
-      await service.createUser(mockEmail, mockPassword);
+      await service.createUser(TEST_EMAIL, TEST_PASSWORD);
 
       expect(mockSupabaseClient.auth.admin.createUser).toHaveBeenCalledWith({
-        email: mockEmail,
-        password: mockPassword,
-        user_metadata: {}, // Should default to empty object
+        email: TEST_EMAIL,
+        password: TEST_PASSWORD,
+        user_metadata: {},
       });
     });
 
     it('should throw error when user creation fails', async () => {
-      const mockError = { message: 'User creation failed', code: '400' };
-      const mockResponse = {
-        data: { user: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.admin.createUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('User creation failed');
+      mockSupabaseClient.auth.admin.createUser.mockResolvedValue(mockResponse);
 
-      await expect(service.createUser(mockEmail, mockPassword)).rejects.toEqual(
-        mockError,
-      );
+      await expect(
+        service.createUser(TEST_EMAIL, TEST_PASSWORD),
+      ).rejects.toEqual(mockResponse.error);
     });
 
     it('should log error when user creation fails', async () => {
-      const mockError = { message: 'User creation failed', code: '400' };
-      const mockResponse = {
-        data: { user: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.admin.createUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('User creation failed');
+      mockSupabaseClient.auth.admin.createUser.mockResolvedValue(mockResponse);
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.createUser(mockEmail, mockPassword);
+        await service.createUser(TEST_EMAIL, TEST_PASSWORD);
       } catch (error) {
         // Expected
       }
 
       expect(loggerSpy).toHaveBeenCalledWith(
         'Failed to create user:',
-        mockError,
+        mockResponse.error,
       );
     });
   });
 
+  // ==========================================================================
+  // DELETE USER TESTS
+  // ==========================================================================
+
   describe('deleteUser', () => {
     it('should delete a user successfully', async () => {
-      const mockResponse = {
-        data: {},
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.admin.deleteUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createSuccessResponse({});
+      mockSupabaseClient.auth.admin.deleteUser.mockResolvedValue(mockResponse);
 
-      await service.deleteUser(mockUserId);
+      await service.deleteUser(TEST_USER_ID);
 
       expect(mockSupabaseClient.auth.admin.deleteUser).toHaveBeenCalledWith(
-        mockUserId,
+        TEST_USER_ID,
       );
     });
 
     it('should throw error when user deletion fails', async () => {
-      const mockError = { message: 'User deletion failed', code: '400' };
-      const mockResponse = {
-        data: {},
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.admin.deleteUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('User deletion failed');
+      mockSupabaseClient.auth.admin.deleteUser.mockResolvedValue(mockResponse);
 
-      await expect(service.deleteUser(mockUserId)).rejects.toEqual(mockError);
+      await expect(service.deleteUser(TEST_USER_ID)).rejects.toEqual(
+        mockResponse.error,
+      );
     });
 
     it('should log error when user deletion fails', async () => {
-      const mockError = { message: 'User deletion failed', code: '400' };
-      const mockResponse = {
-        data: {},
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.admin.deleteUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('User deletion failed');
+      mockSupabaseClient.auth.admin.deleteUser.mockResolvedValue(mockResponse);
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.deleteUser(mockUserId);
+        await service.deleteUser(TEST_USER_ID);
       } catch (error) {
         // Expected
       }
 
       expect(loggerSpy).toHaveBeenCalledWith(
         'Failed to delete user:',
-        mockError,
+        mockResponse.error,
       );
     });
   });
 
+  // ==========================================================================
+  // SIGN IN TESTS
+  // ==========================================================================
+
   describe('signInWithPassword', () => {
     it('should sign in with password successfully', async () => {
-      const mockSession = {
-        access_token: mockAccessToken,
-        refresh_token: mockRefreshToken,
+      const mockSession = createMockSession(mockUser);
+      const mockResponse = createSuccessResponse({
         user: mockUser,
-      };
-      const mockResponse = {
-        data: { user: mockUser, session: mockSession },
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.signInWithPassword as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+        session: mockSession,
+      });
+      mockSupabaseClient.auth.signInWithPassword.mockResolvedValue(
+        mockResponse,
+      );
 
-      const result = await service.signInWithPassword(mockEmail, mockPassword);
+      const result = await service.signInWithPassword(
+        TEST_EMAIL,
+        TEST_PASSWORD,
+      );
 
       expect(mockSupabaseClient.auth.signInWithPassword).toHaveBeenCalledWith({
-        email: mockEmail,
-        password: mockPassword,
+        email: TEST_EMAIL,
+        password: TEST_PASSWORD,
       });
       expect(result).toEqual(mockResponse.data);
     });
 
     it('should throw error when sign in fails', async () => {
-      const mockError = { message: 'Sign in failed', code: '400' };
-      const mockResponse = {
+      const mockResponse = createErrorResponse('Sign in failed');
+      mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
         data: { user: null, session: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.signInWithPassword as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+        error: mockResponse.error,
+      });
 
       await expect(
-        service.signInWithPassword(mockEmail, mockPassword),
-      ).rejects.toEqual(mockError);
+        service.signInWithPassword(TEST_EMAIL, TEST_PASSWORD),
+      ).rejects.toEqual(mockResponse.error);
     });
 
     it('should log error when sign in fails', async () => {
-      const mockError = { message: 'Sign in failed', code: '400' };
-      const mockResponse = {
+      const mockResponse = createErrorResponse('Sign in failed');
+      mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
         data: { user: null, session: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.signInWithPassword as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+        error: mockResponse.error,
+      });
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.signInWithPassword(mockEmail, mockPassword);
+        await service.signInWithPassword(TEST_EMAIL, TEST_PASSWORD);
       } catch (error) {
         // Expected
       }
 
-      expect(loggerSpy).toHaveBeenCalledWith('Sign in failed:', mockError);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Sign in failed:',
+        mockResponse.error,
+      );
     });
   });
 
+  // ==========================================================================
+  // SIGN OUT TESTS
+  // ==========================================================================
+
   describe('signOut', () => {
     it('should sign out user successfully', async () => {
-      const mockResponse = {
-        data: {},
-        error: null,
-      };
+      const mockResponse = createSuccessResponse({});
+      const mockUserClient = createMockSupabaseClient();
+      mockUserClient.auth.signOut.mockResolvedValue(mockResponse);
+      mockCreateClient.mockReturnValue(mockUserClient);
 
-      const mockUserClient = {
-        auth: {
-          signOut: jest.fn().mockResolvedValue(mockResponse),
-        },
-      } as jest.Mocked<SupabaseClient<any, any, any, any>>;
-
-      mockCreateClient.mockReturnValue(mockUserClient); // Mock createClient to return the user client for signOut
-
-      await service.signOut(mockAccessToken);
+      await service.signOut(TEST_ACCESS_TOKEN);
 
       expect(mockCreateClient).toHaveBeenCalledWith(
         'https://test.supabase.co',
@@ -339,7 +365,7 @@ describe('SupabaseService', () => {
         {
           global: {
             headers: {
-              Authorization: `Bearer ${mockAccessToken}`,
+              Authorization: `Bearer ${TEST_ACCESS_TOKEN}`,
             },
           },
         },
@@ -348,492 +374,409 @@ describe('SupabaseService', () => {
     });
 
     it('should throw error when sign out fails', async () => {
-      const mockError = { message: 'Sign out failed', code: '400' };
-      const mockResponse = {
-        data: {},
-        error: mockError,
-      };
-
-      const mockUserClient = {
-        auth: {
-          signOut: jest.fn().mockResolvedValue(mockResponse),
-        },
-      } as jest.Mocked<SupabaseClient<any, any, any, any>>;
-
+      const mockResponse = createErrorResponse('Sign out failed');
+      const mockUserClient = createMockSupabaseClient();
+      mockUserClient.auth.signOut.mockResolvedValue(mockResponse);
       mockCreateClient.mockReturnValue(mockUserClient);
 
-      await expect(service.signOut(mockAccessToken)).rejects.toEqual(mockError);
+      await expect(service.signOut(TEST_ACCESS_TOKEN)).rejects.toEqual(
+        mockResponse.error,
+      );
     });
 
     it('should log error when sign out fails', async () => {
-      const mockError = { message: 'Sign out failed', code: '400' };
-      const mockResponse = {
-        data: {},
-        error: mockError,
-      };
-
-      const mockUserClient = {
-        auth: {
-          signOut: jest.fn().mockResolvedValue(mockResponse),
-        },
-      } as jest.Mocked<SupabaseClient<any, any, any, any>>;
-
+      const mockResponse = createErrorResponse('Sign out failed');
+      const mockUserClient = createMockSupabaseClient();
+      mockUserClient.auth.signOut.mockResolvedValue(mockResponse);
       mockCreateClient.mockReturnValue(mockUserClient);
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.signOut(mockAccessToken);
+        await service.signOut(TEST_ACCESS_TOKEN);
       } catch (error) {
         // Expected
       }
 
-      expect(loggerSpy).toHaveBeenCalledWith('Sign out failed:', mockError);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Sign out failed:',
+        mockResponse.error,
+      );
     });
   });
 
+  // ==========================================================================
+  // VERIFY TOKEN TESTS
+  // ==========================================================================
+
   describe('verifyToken', () => {
     it('should verify token and return user successfully', async () => {
-      const mockResponse = {
-        data: { user: mockUser },
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.getUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createSuccessResponse({ user: mockUser });
+      mockSupabaseClient.auth.getUser.mockResolvedValue(mockResponse);
 
-      const result = await service.verifyToken(mockAccessToken);
+      const result = await service.verifyToken(TEST_ACCESS_TOKEN);
 
       expect(mockSupabaseClient.auth.getUser).toHaveBeenCalledWith(
-        mockAccessToken,
+        TEST_ACCESS_TOKEN,
       );
       expect(result).toEqual(mockUser);
     });
 
     it('should throw error when token verification fails', async () => {
-      const mockError = { message: 'Token verification failed', code: '400' };
-      const mockResponse = {
-        data: { user: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.getUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Token verification failed');
+      mockSupabaseClient.auth.getUser.mockResolvedValue(mockResponse);
 
-      await expect(service.verifyToken(mockAccessToken)).rejects.toEqual(
-        mockError,
+      await expect(service.verifyToken(TEST_ACCESS_TOKEN)).rejects.toEqual(
+        mockResponse.error,
       );
     });
 
     it('should throw error when user not found', async () => {
-      const mockResponse = {
-        data: { user: null },
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.getUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createSuccessResponse({ user: null });
+      mockSupabaseClient.auth.getUser.mockResolvedValue(mockResponse);
 
-      await expect(service.verifyToken(mockAccessToken)).rejects.toEqual(
+      await expect(service.verifyToken(TEST_ACCESS_TOKEN)).rejects.toEqual(
         new Error('User not found'),
       );
     });
 
     it('should log error when token verification fails', async () => {
-      const mockError = { message: 'Token verification failed', code: '400' };
-      const mockResponse = {
-        data: { user: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.getUser as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Token verification failed');
+      mockSupabaseClient.auth.getUser.mockResolvedValue(mockResponse);
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.verifyToken(mockAccessToken);
+        await service.verifyToken(TEST_ACCESS_TOKEN);
       } catch (error) {
         // Expected
       }
 
       expect(loggerSpy).toHaveBeenCalledWith(
         'Token verification failed:',
-        mockError,
+        mockResponse.error,
       );
     });
   });
 
+  // ==========================================================================
+  // REFRESH SESSION TESTS
+  // ==========================================================================
+
   describe('refreshSession', () => {
     it('should refresh session successfully', async () => {
-      const mockSession = {
+      const mockSession = createMockSession(mockUser, {
         access_token: 'new-access-token',
-        refresh_token: mockRefreshToken,
+      });
+      const mockResponse = createSuccessResponse({
         user: mockUser,
-      };
-      const mockResponse = {
-        data: { user: mockUser, session: mockSession },
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.refreshSession as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+        session: mockSession,
+      });
+      mockSupabaseClient.auth.refreshSession.mockResolvedValue(mockResponse);
 
-      const result = await service.refreshSession(mockRefreshToken);
+      const result = await service.refreshSession(TEST_REFRESH_TOKEN);
 
       expect(mockSupabaseClient.auth.refreshSession).toHaveBeenCalledWith({
-        refresh_token: mockRefreshToken,
+        refresh_token: TEST_REFRESH_TOKEN,
       });
       expect(result).toEqual(mockResponse.data);
     });
 
     it('should throw error when session refresh fails', async () => {
-      const mockError = { message: 'Session refresh failed', code: '400' };
-      const mockResponse = {
+      const mockResponse = createErrorResponse('Session refresh failed');
+      mockSupabaseClient.auth.refreshSession.mockResolvedValue({
         data: { user: null, session: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.refreshSession as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+        error: mockResponse.error,
+      });
 
-      await expect(service.refreshSession(mockRefreshToken)).rejects.toEqual(
-        mockError,
+      await expect(service.refreshSession(TEST_REFRESH_TOKEN)).rejects.toEqual(
+        mockResponse.error,
       );
     });
 
     it('should log error when session refresh fails', async () => {
-      const mockError = { message: 'Session refresh failed', code: '400' };
-      const mockResponse = {
+      const mockResponse = createErrorResponse('Session refresh failed');
+      mockSupabaseClient.auth.refreshSession.mockResolvedValue({
         data: { user: null, session: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.refreshSession as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+        error: mockResponse.error,
+      });
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.refreshSession(mockRefreshToken);
+        await service.refreshSession(TEST_REFRESH_TOKEN);
       } catch (error) {
         // Expected
       }
 
       expect(loggerSpy).toHaveBeenCalledWith(
         'Session refresh failed:',
-        mockError,
+        mockResponse.error,
       );
     });
   });
 
-  describe('updateUserEmail', () => {
-    it('should update user email successfully', async () => {
-      const mockResponse = {
-        data: { user: mockUser },
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.admin.updateUserById as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+  // ==========================================================================
+  // UPDATE USER EMAIL TESTS
+  // ==========================================================================
 
-      const result = await service.updateUserEmail(
-        mockUserId,
-        'new@example.com',
+  describe('updateUserEmail', () => {
+    const NEW_EMAIL = 'new@example.com';
+
+    it('should update user email successfully', async () => {
+      const mockResponse = createSuccessResponse({ user: mockUser });
+      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue(
+        mockResponse,
       );
 
+      const result = await service.updateUserEmail(TEST_USER_ID, NEW_EMAIL);
+
       expect(mockSupabaseClient.auth.admin.updateUserById).toHaveBeenCalledWith(
-        mockUserId,
-        {
-          email: 'new@example.com',
-        },
+        TEST_USER_ID,
+        { email: NEW_EMAIL },
       );
       expect(result).toEqual(mockUser);
     });
 
     it('should throw error when email update fails', async () => {
-      const mockError = { message: 'Email update failed', code: '400' };
-      const mockResponse = {
-        data: { user: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.admin.updateUserById as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Email update failed');
+      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue(
+        mockResponse,
+      );
 
       await expect(
-        service.updateUserEmail(mockUserId, 'new@example.com'),
-      ).rejects.toEqual(mockError);
+        service.updateUserEmail(TEST_USER_ID, NEW_EMAIL),
+      ).rejects.toEqual(mockResponse.error);
     });
 
     it('should log error when email update fails', async () => {
-      const mockError = { message: 'Email update failed', code: '400' };
-      const mockResponse = {
-        data: { user: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.admin.updateUserById as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Email update failed');
+      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue(
+        mockResponse,
+      );
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.updateUserEmail(mockUserId, 'new@example.com');
+        await service.updateUserEmail(TEST_USER_ID, NEW_EMAIL);
       } catch (error) {
         // Expected
       }
 
       expect(loggerSpy).toHaveBeenCalledWith(
         'Failed to update email:',
-        mockError,
+        mockResponse.error,
       );
     });
   });
 
+  // ==========================================================================
+  // UPDATE USER PASSWORD TESTS
+  // ==========================================================================
+
   describe('updateUserPassword', () => {
+    const NEW_PASSWORD = 'new-password';
+
     it('should update user password successfully', async () => {
-      const mockResponse = {
-        data: { user: mockUser },
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.admin.updateUserById as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createSuccessResponse({ user: mockUser });
+      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue(
+        mockResponse,
+      );
 
       const result = await service.updateUserPassword(
-        mockUserId,
-        'new-password',
+        TEST_USER_ID,
+        NEW_PASSWORD,
       );
 
       expect(mockSupabaseClient.auth.admin.updateUserById).toHaveBeenCalledWith(
-        mockUserId,
-        {
-          password: 'new-password',
-        },
+        TEST_USER_ID,
+        { password: NEW_PASSWORD },
       );
       expect(result).toEqual(mockUser);
     });
 
     it('should throw error when password update fails', async () => {
-      const mockError = { message: 'Password update failed', code: '400' };
-      const mockResponse = {
-        data: { user: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.admin.updateUserById as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Password update failed');
+      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue(
+        mockResponse,
+      );
 
       await expect(
-        service.updateUserPassword(mockUserId, 'new-password'),
-      ).rejects.toEqual(mockError);
+        service.updateUserPassword(TEST_USER_ID, NEW_PASSWORD),
+      ).rejects.toEqual(mockResponse.error);
     });
 
     it('should log error when password update fails', async () => {
-      const mockError = { message: 'Password update failed', code: '400' };
-      const mockResponse = {
-        data: { user: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.admin.updateUserById as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Password update failed');
+      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue(
+        mockResponse,
+      );
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.updateUserPassword(mockUserId, 'new-password');
+        await service.updateUserPassword(TEST_USER_ID, NEW_PASSWORD);
       } catch (error) {
         // Expected
       }
 
       expect(loggerSpy).toHaveBeenCalledWith(
         'Failed to update password:',
-        mockError,
+        mockResponse.error,
       );
     });
   });
 
-  describe('updateUserMetadata', () => {
-    it('should update user metadata successfully', async () => {
-      const mockResponse = {
-        data: { user: mockUser },
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.admin.updateUserById as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+  // ==========================================================================
+  // UPDATE USER METADATA TESTS
+  // ==========================================================================
 
-      const result = await service.updateUserMetadata(mockUserId, {
-        name: 'New Name',
-      });
+  describe('updateUserMetadata', () => {
+    const NEW_METADATA = { name: 'New Name' };
+
+    it('should update user metadata successfully', async () => {
+      const mockResponse = createSuccessResponse({ user: mockUser });
+      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue(
+        mockResponse,
+      );
+
+      const result = await service.updateUserMetadata(
+        TEST_USER_ID,
+        NEW_METADATA,
+      );
 
       expect(mockSupabaseClient.auth.admin.updateUserById).toHaveBeenCalledWith(
-        mockUserId,
-        {
-          user_metadata: { name: 'New Name' },
-        },
+        TEST_USER_ID,
+        { user_metadata: NEW_METADATA },
       );
       expect(result).toEqual(mockUser);
     });
 
     it('should throw error when metadata update fails', async () => {
-      const mockError = { message: 'Metadata update failed', code: '400' };
-      const mockResponse = {
-        data: { user: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.admin.updateUserById as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Metadata update failed');
+      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue(
+        mockResponse,
+      );
 
       await expect(
-        service.updateUserMetadata(mockUserId, { name: 'New Name' }),
-      ).rejects.toEqual(mockError);
+        service.updateUserMetadata(TEST_USER_ID, NEW_METADATA),
+      ).rejects.toEqual(mockResponse.error);
     });
 
     it('should log error when metadata update fails', async () => {
-      const mockError = { message: 'Metadata update failed', code: '400' };
-      const mockResponse = {
-        data: { user: null },
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.admin.updateUserById as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Metadata update failed');
+      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue(
+        mockResponse,
+      );
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.updateUserMetadata(mockUserId, { name: 'New Name' });
+        await service.updateUserMetadata(TEST_USER_ID, NEW_METADATA);
       } catch (error) {
         // Expected
       }
 
       expect(loggerSpy).toHaveBeenCalledWith(
         'Failed to update metadata:',
-        mockError,
+        mockResponse.error,
       );
     });
   });
 
+  // ==========================================================================
+  // SEND PASSWORD RECOVERY EMAIL TESTS
+  // ==========================================================================
+
   describe('sendPasswordRecoveryEmail', () => {
     it('should send password recovery email successfully', async () => {
-      const mockResponse = {
-        data: {},
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth
-          .resetPasswordForEmail as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createSuccessResponse({});
+      mockSupabaseClient.auth.resetPasswordForEmail.mockResolvedValue(
+        mockResponse,
+      );
 
-      await service.sendPasswordRecoveryEmail(mockEmail);
+      await service.sendPasswordRecoveryEmail(TEST_EMAIL);
 
       expect(
         mockSupabaseClient.auth.resetPasswordForEmail,
-      ).toHaveBeenCalledWith(mockEmail, {
+      ).toHaveBeenCalledWith(TEST_EMAIL, {
         redirectTo: 'https://test-frontend.com/auth/reset-password',
       });
     });
 
     it('should throw error when sending recovery email fails', async () => {
-      const mockError = { message: 'Recovery email failed', code: '400' };
-      const mockResponse = {
-        data: {},
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth
-          .resetPasswordForEmail as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Recovery email failed');
+      mockSupabaseClient.auth.resetPasswordForEmail.mockResolvedValue(
+        mockResponse,
+      );
 
       await expect(
-        service.sendPasswordRecoveryEmail(mockEmail),
-      ).rejects.toEqual(mockError);
+        service.sendPasswordRecoveryEmail(TEST_EMAIL),
+      ).rejects.toEqual(mockResponse.error);
     });
 
     it('should log error when sending recovery email fails', async () => {
-      const mockError = { message: 'Recovery email failed', code: '400' };
-      const mockResponse = {
-        data: {},
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth
-          .resetPasswordForEmail as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Recovery email failed');
+      mockSupabaseClient.auth.resetPasswordForEmail.mockResolvedValue(
+        mockResponse,
+      );
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.sendPasswordRecoveryEmail(mockEmail);
+        await service.sendPasswordRecoveryEmail(TEST_EMAIL);
       } catch (error) {
         // Expected
       }
 
       expect(loggerSpy).toHaveBeenCalledWith(
         'Failed to send recovery email:',
-        mockError,
+        mockResponse.error,
       );
     });
   });
 
+  // ==========================================================================
+  // SEND VERIFICATION EMAIL TESTS
+  // ==========================================================================
+
   describe('sendVerificationEmail', () => {
     it('should send verification email successfully', async () => {
-      const mockResponse = {
-        data: {},
-        error: null,
-      };
-      (
-        mockSupabaseClient.auth.resend as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createSuccessResponse({});
+      mockSupabaseClient.auth.resend.mockResolvedValue(mockResponse);
 
-      await service.sendVerificationEmail(mockEmail);
+      await service.sendVerificationEmail(TEST_EMAIL);
 
       expect(mockSupabaseClient.auth.resend).toHaveBeenCalledWith({
         type: 'signup',
-        email: mockEmail,
+        email: TEST_EMAIL,
       });
     });
 
     it('should throw error when sending verification email fails', async () => {
-      const mockError = { message: 'Verification email failed', code: '400' };
-      const mockResponse = {
-        data: {},
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.resend as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Verification email failed');
+      mockSupabaseClient.auth.resend.mockResolvedValue(mockResponse);
 
-      await expect(service.sendVerificationEmail(mockEmail)).rejects.toEqual(
-        mockError,
+      await expect(service.sendVerificationEmail(TEST_EMAIL)).rejects.toEqual(
+        mockResponse.error,
       );
     });
 
     it('should log error when sending verification email fails', async () => {
-      const mockError = { message: 'Verification email failed', code: '400' };
-      const mockResponse = {
-        data: {},
-        error: mockError,
-      };
-      (
-        mockSupabaseClient.auth.resend as jest.MockedFunction<any>
-      ).mockResolvedValue(mockResponse);
+      const mockResponse = createErrorResponse('Verification email failed');
+      mockSupabaseClient.auth.resend.mockResolvedValue(mockResponse);
 
       const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       try {
-        await service.sendVerificationEmail(mockEmail);
+        await service.sendVerificationEmail(TEST_EMAIL);
       } catch (error) {
         // Expected
       }
 
       expect(loggerSpy).toHaveBeenCalledWith(
         'Failed to send verification email:',
-        mockError,
+        mockResponse.error,
       );
     });
   });
