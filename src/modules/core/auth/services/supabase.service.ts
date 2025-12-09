@@ -52,7 +52,7 @@ export class SupabaseService implements OnModuleInit {
         email,
         password,
         user_metadata: metadata || {},
-        email_confirm: true,
+        // email_confirm: true,
       });
 
       if (error) {
