@@ -1,6 +1,6 @@
 // ============================================================================
 // src/modules/core/auth/guards/jwt-auth.guard.ts
-// Type-Safe JWT Guard - No Passport Required
+// Type-Safe JWT Guard - No Passport Required - DEBUG VERSION
 // ============================================================================
 
 import {
@@ -38,17 +38,31 @@ export class JwtAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const handler = context.getHandler();
+    const controller = context.getClass();
+    const request = context.switchToHttp().getRequest<Request>();
+
+    this.logger.debug(
+      `JwtAuthGuard checking: ${controller.name} -> ${handler.name} (Path: ${request.url})`,
+    );
+
     // 1. Check if route is marked as @Public()
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
+      handler, // context.getHandler()
+      controller, // context.getClass()
     ]);
 
+    this.logger.debug(
+      `JwtAuthGuard: isPublic flag for ${request.url} = ${isPublic}`,
+    );
+
     if (isPublic) {
+      this.logger.debug(
+        `JwtAuthGuard: Allowing public access to ${request.url}`,
+      );
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromHeader(request);
 
     // 2. No token provided

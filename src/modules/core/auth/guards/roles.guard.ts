@@ -1,12 +1,14 @@
 // ============================================================================
 // src/modules/core/auth/guards/roles.guard.ts
 // Type-Safe Role-Based Access Control Guard
+// ✅ NOW RESPECTS @Public() DECORATOR
 // ============================================================================
 
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { ROLES_KEY } from '../decorators/roles.decorator';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator'; // ✅ IMPORT THIS
 import { UserRole } from '../models/user.model';
 import { ERROR_CODES } from '@shared/error/constants/error-codes.constant';
 import { AppError } from '@shared/error/classes/app-error.class';
@@ -24,6 +26,17 @@ export class RolesGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
+    // ✅ CRITICAL FIX: Check if route is public FIRST
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      // Route is public - skip role check entirely
+      return true;
+    }
+
     // 1. Get required roles from @Roles() decorator
     const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
       ROLES_KEY,

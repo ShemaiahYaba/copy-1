@@ -3,15 +3,7 @@
 // src/modules/shared/error/filters/app-error/app-error.filter.ts
 // ----------------------------------------------------------------------------
 
-import {
-  ExceptionFilter,
-  Catch,
-  ArgumentsHost,
-  HttpException,
-  BadRequestException,
-  Inject,
-  Logger,
-} from '@nestjs/common';
+import * as common from '@nestjs/common';
 import { Response, Request } from 'express';
 import { SentryExceptionCaptured } from '@sentry/nestjs';
 
@@ -24,14 +16,14 @@ import { ErrorCode, ERROR_CODES } from '../../constants/error-codes.constant';
 import { NotificationService } from '../../../notification/notification.service';
 import { NotificationType } from '../../../notification/interfaces/notification.interface';
 
-@Catch()
-export class AppErrorFilter implements ExceptionFilter {
-  private readonly logger = new Logger(AppErrorFilter.name);
+@common.Catch()
+export class AppErrorFilter implements common.ExceptionFilter {
+  private readonly logger = new common.Logger(AppErrorFilter.name);
 
   constructor(
     private readonly errorService: ErrorService,
     private readonly notificationService: NotificationService,
-    @Inject('ERROR_CONFIG') private readonly config: ErrorConfigDto,
+    @common.Inject('ERROR_CONFIG') private readonly config: ErrorConfigDto,
   ) {}
 
   /**
@@ -39,13 +31,13 @@ export class AppErrorFilter implements ExceptionFilter {
    * The @SentryExceptionCaptured() decorator automatically reports exceptions to Sentry
    */
   @SentryExceptionCaptured()
-  catch(rawException: unknown, host: ArgumentsHost) {
+  catch(rawException: unknown, host: common.ArgumentsHost) {
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
 
     // Handle BadRequestException (validation errors) specially
-    if (rawException instanceof BadRequestException) {
+    if (rawException instanceof common.BadRequestException) {
       return this.handleValidationError(rawException, req, res);
     }
 
@@ -89,7 +81,7 @@ export class AppErrorFilter implements ExceptionFilter {
   // Helper: Handle validation errors (BadRequestException)
   // --------------------------------------------------------------------------
   private handleValidationError(
-    exception: BadRequestException,
+    exception: common.BadRequestException,
     req: Request,
     res: Response,
   ) {
@@ -164,7 +156,7 @@ export class AppErrorFilter implements ExceptionFilter {
   // --------------------------------------------------------------------------
   private extractStatusCode(exception: unknown, errorCode: ErrorCode): number {
     // For HttpException, use its status directly
-    if (exception instanceof HttpException) {
+    if (exception instanceof common.HttpException) {
       return exception.getStatus();
     }
 

@@ -61,13 +61,13 @@ describe('AuthModule Integration Tests (Supabase)', () => {
           logErrors: false,
           captureContext: false,
         }),
-        AuthModule,
+        AuthModule, // ✅ This imports the module with global guards
       ],
     }).compile();
 
     app = moduleFixture.createNestApplication();
 
-    // Add global validation pipe
+    // ✅ CRITICAL: Add global validation pipe BEFORE init()
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -76,9 +76,15 @@ describe('AuthModule Integration Tests (Supabase)', () => {
       }),
     );
 
+    // ✅ Initialize the app (this sets up guards, pipes, etc.)
     await app.init();
 
     supabaseService = moduleFixture.get<SupabaseService>(SupabaseService);
+
+    // ✅ DEBUGGING: Log to verify guards are set up
+    console.log(
+      '✅ Test app initialized with AuthModule (global guards active)',
+    );
   });
 
   afterAll(async () => {
