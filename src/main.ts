@@ -1,5 +1,5 @@
 // ----------------------------------------------------------------------------
-// MAIN APPLICATION ENTRY POINT WITH SWAGGER
+// MAIN APPLICATION ENTRY POINT
 // src/main.ts
 // ----------------------------------------------------------------------------
 
@@ -8,9 +8,9 @@ import './instrument';
 
 // Now import everything else
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -33,28 +33,45 @@ async function bootstrap() {
   // CORS CONFIGURATION
   // ============================================================================
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || [
-      'http://localhost:3000',
-      'http://localhost:3001',
-    ],
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
-      'X-User-Id',
-      'X-Org-Id',
-      'X-Correlation-Id',
+      'x-user-id',
+      'x-org-id',
+      'x-correlation-id',
     ],
   });
 
   // ============================================================================
-  // SWAGGER / OPENAPI DOCUMENTATION
+  // SWAGGER DOCUMENTATION SETUP
   // ============================================================================
-  const config = new DocumentBuilder()
+  const swaggerConfig = new DocumentBuilder()
     .setTitle('Gradlinq API')
     .setDescription(
-      'Complete API documentation for Gradlinq - An enterprise-grade platform for managing student internships, university partnerships, and client projects.',
+      `
+# Gradlinq API Documentation
+
+Enterprise-grade API for managing student internships, projects, and university collaborations.
+
+## Features
+- **Supabase Authentication** - Secure JWT-based authentication
+- **4 User Roles** - Client, Supervisor, Student, University
+- **Real-time Notifications** - WebSocket-based notifications
+- **Error Handling** - Standardized error responses with Sentry integration
+- **Type Safety** - Full TypeScript support
+
+## Authentication
+Most endpoints require a JWT token. After logging in or registering, use the \`access_token\` from the response.
+
+Click the 🔓 **Authorize** button above and enter: \`Bearer YOUR_ACCESS_TOKEN\`
+
+## Support
+- **Documentation**: [API Docs](https://docs.gradlinq.com)
+- **Email**: support@gradlinq.com
+    `.trim(),
     )
     .setVersion('2.0.0')
     .setContact(
@@ -63,115 +80,47 @@ async function bootstrap() {
       'support@gradlinq.com',
     )
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
-    .addServer('http://localhost:3000', 'Local Development')
-    .addServer('https://api-staging.gradlinq.com', 'Staging')
-    .addServer('https://api.gradlinq.com', 'Production')
-
-    // ============================================================================
-    // AUTHENTICATION SCHEMES
-    // ============================================================================
+    .addTag('auth', 'Authentication and user management endpoints')
+    .addTag('projects', 'Project management endpoints (coming soon)')
+    .addTag('students', 'Student management endpoints (coming soon)')
+    .addTag('supervisors', 'Supervisor management endpoints (coming soon)')
     .addBearerAuth(
       {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
-        name: 'Authorization',
-        description: 'Enter JWT token',
+        name: 'JWT',
+        description: 'Enter your JWT access token',
         in: 'header',
       },
-      'JWT', // This name must match the one used in @ApiBearerAuth()
+      'JWT-auth', // This name must match @ApiBearerAuth() in decorators
     )
-    .addApiKey(
-      {
-        type: 'apiKey',
-        name: 'X-API-Key',
-        in: 'header',
-        description: 'API Key for external integrations',
-      },
-      'API-Key',
-    )
-
-    // ============================================================================
-    // GLOBAL TAGS (Organized by Feature)
-    // ============================================================================
-    .addTag('auth', 'Authentication and authorization endpoints')
-    .addTag('users', 'User management and profiles')
-    .addTag('projects', 'Project management')
-    .addTag('tasks', 'Task management')
-    .addTag('clients', 'Client management')
-    .addTag('supervisors', 'Supervisor management')
-    .addTag('students', 'Student management')
-    .addTag('universities', 'University management')
-    .addTag('notifications', 'Real-time notifications')
-    .addTag('admin', 'Administrative endpoints')
-
-    // ============================================================================
-    // EXTERNAL DOCUMENTATION
-    // ============================================================================
-    .setExternalDoc('Full Documentation', 'https://docs.gradlinq.com')
-
+    .addServer('http://localhost:3000', 'Local Development')
+    .addServer('https://api.gradlinq.com', 'Production')
     .build();
 
-  const document = SwaggerModule.createDocument(app, config, {
-    // ============================================================================
-    // SWAGGER OPTIONS
-    // ============================================================================
-    operationIdFactory: (controllerKey: string, methodKey: string) =>
-      `${controllerKey}_${methodKey}`,
-
-    // Include all modules
-    include: [],
-
-    // Deep scan for all decorators
-    deepScanRoutes: true,
-
-    // Ignore global prefix if you have one
-    ignoreGlobalPrefix: false,
-
-    // Extra models to include (if you have shared DTOs)
-    extraModels: [
-      // Add any shared DTOs here if needed
-      // Example: SharedResponseDto, PaginatedResponseDto, etc.
-    ],
+  const document = SwaggerModule.createDocument(app, swaggerConfig, {
+    operationIdFactory: (controllerKey: string, methodKey: string) => methodKey,
   });
 
-  // ============================================================================
-  // CUSTOMIZE SWAGGER UI
-  // ============================================================================
-  SwaggerModule.setup('api', app, document, {
-    customSiteTitle: 'Gradlinq API Documentation',
-    customfavIcon: 'https://gradlinq.com/favicon.ico',
-    customCss: `
-      .swagger-ui .topbar { 
-        background-color: #2c3e50; 
-      }
-      .swagger-ui .topbar-wrapper img { 
-        content: url('https://gradlinq.com/logo.png'); 
-      }
-      .swagger-ui .scheme-container {
-        background: #fafafa;
-        padding: 20px;
-        margin: 20px 0;
-      }
-    `,
+  // Setup Swagger UI
+  SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: {
-      persistAuthorization: true, // Remember auth tokens
-      displayRequestDuration: true, // Show request timing
-      filter: true, // Enable search/filter
-      showExtensions: true,
-      showCommonExtensions: true,
-      docExpansion: 'list', // 'list' | 'full' | 'none'
-      defaultModelsExpandDepth: 1,
-      defaultModelExpandDepth: 1,
-      tryItOutEnabled: true,
-      requestSnippetsEnabled: true,
-      syntaxHighlight: {
-        activate: true,
-        theme: 'monokai',
-      },
+      persistAuthorization: true, // Keep auth token after page refresh
       tagsSorter: 'alpha', // Sort tags alphabetically
       operationsSorter: 'alpha', // Sort operations alphabetically
+      docExpansion: 'none', // Collapse all sections by default
+      filter: true, // Enable search filter
+      tryItOutEnabled: true, // Enable "Try it out" by default
+      displayRequestDuration: true, // Show request duration
     },
+    customCss: `
+      .swagger-ui .topbar { display: none }
+      .swagger-ui .info { margin: 20px 0 }
+      .swagger-ui .scheme-container { margin: 20px 0 }
+    `,
+    customSiteTitle: 'Gradlinq API Documentation',
+    customfavIcon: 'https://gradlinq.com/favicon.ico',
   });
 
   // ============================================================================
@@ -183,40 +132,25 @@ async function bootstrap() {
   // ============================================================================
   // STARTUP LOGS
   // ============================================================================
-  console.log('\n' + '='.repeat(80));
-  console.log('🚀 Gradlinq API Server Started Successfully');
-  console.log('='.repeat(80));
-  console.log(`📍 Server URL:        http://localhost:${port}`);
-  console.log(`📖 API Documentation: http://localhost:${port}/api`);
-  console.log(`📊 Swagger JSON:      http://localhost:${port}/api-json`);
+  const appUrl = await app.getUrl();
+  console.log('');
+  console.log('🚀 ============================================');
+  console.log('🚀  Application Started Successfully!');
+  console.log('🚀 ============================================');
+  console.log('');
+  console.log(`📍 Server URL:        ${appUrl}`);
+  console.log(`📚 Swagger Docs:      ${appUrl}/api/docs`);
+  console.log(`📄 OpenAPI JSON:      ${appUrl}/api/docs-json`);
   console.log(`🌍 Environment:       ${process.env.NODE_ENV || 'development'}`);
   console.log(
-    `🔐 Sentry:            ${process.env.SENTRY_ENABLED === 'true' ? 'Enabled' : 'Disabled'}`,
+    `🔐 Sentry Enabled:    ${process.env.SENTRY_ENABLED === 'true' ? 'Yes' : 'No'}`,
   );
-  console.log('='.repeat(80) + '\n');
-
-  // ============================================================================
-  // GRACEFUL SHUTDOWN
-  // ============================================================================
-  const handleShutdown = (signal: string) => {
-    console.log(`📥 ${signal} received. Shutting down gracefully...`);
-    app
-      .close()
-      .then(() => {
-        console.log('✅ Application closed successfully');
-        process.exit(0);
-      })
-      .catch((error) => {
-        console.error('❌ Error during shutdown:', error);
-        process.exit(1);
-      });
-  };
-
-  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-  process.on('SIGINT', () => handleShutdown('SIGINT'));
+  console.log('');
+  console.log('🚀 ============================================');
+  console.log('');
 }
 
 bootstrap().catch((error) => {
-  console.error('❌ Fatal error during bootstrap:', error);
+  console.error('❌ Failed to start application:', error);
   process.exit(1);
 });
