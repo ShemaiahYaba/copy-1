@@ -3,13 +3,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { io, Socket as ClientSocket } from 'socket.io-client';
-import { NotificationModule } from '../notification/notification.module';
-import { NotificationService } from '../notification/notification.service';
-import {
-  NotificationConfigDto,
-  NotificationAdapter,
-} from '../notification/dto';
-import { NotificationType, INotification } from '../notification/interfaces';
+import { NotificationModule } from '../notification.module';
+import { NotificationService } from '../notification.service';
+import { NotificationAdapter } from '../dto';
+import { NotificationType, INotification } from '../interfaces';
 
 describe('NotificationModule Integration Tests', () => {
   let app: INestApplication;
@@ -457,7 +454,10 @@ describe('NotificationModule Integration Tests', () => {
           }
         };
         clientSocket.on('notification', handler);
-        setTimeout(() => reject(new Error('Did not receive valid notification')), 2000);
+        setTimeout(
+          () => reject(new Error('Did not receive valid notification')),
+          2000,
+        );
       });
 
       await expect(

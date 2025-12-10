@@ -1,21 +1,36 @@
 // ----------------------------------------------------------------------------
-// ERROR SERVICE - UNIT TESTS
+// ERROR SERVICE - UNIT TESTS (UPDATED FOR SENTRY)
 // src/modules/shared/error/__tests__/error.service.spec.ts
 // ----------------------------------------------------------------------------
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus } from '@nestjs/common';
-import { ErrorService } from '../error/error.service';
+import { ErrorService } from '../error.service';
 import {
   ErrorConfigDto,
   ErrorNotificationStrategy,
-} from '../error/dto/error-config.dto';
-import { AppError } from '../error/classes/app-error.class';
-import { ValidationError } from '../error/classes/validation-error.class';
-import { BusinessError } from './classes/business-error.class';
-import { ERROR_CODES } from '../error/constants/error-codes.constant';
-import { ErrorSeverity } from '../error/interfaces/error.interface';
-import { ErrorResponseDto } from '../error/dto/error-response.dto';
+} from '../dto/error-config.dto';
+import { AppError } from '../classes/app-error.class';
+import { ValidationError } from '../classes/validation-error.class';
+import { BusinessError } from '../classes/business-error.class';
+import { ERROR_CODES } from '../constants/error-codes.constant';
+import { ErrorSeverity } from '../interfaces/error.interface';
+import { ErrorResponseDto } from '../dto/error-response.dto';
+import * as Sentry from '@sentry/nestjs';
+
+// Mock Sentry
+jest.mock('@sentry/nestjs', () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  withScope: jest.fn((callback) => {
+    const mockScope = {
+      setLevel: jest.fn(),
+      setTag: jest.fn(),
+      setContext: jest.fn(),
+    };
+    callback(mockScope);
+  }),
+}));
 
 describe('ErrorService', () => {
   let service: ErrorService;
@@ -41,6 +56,9 @@ describe('ErrorService', () => {
     }).compile();
 
     service = module.get<ErrorService>(ErrorService);
+
+    // Clear mocks
+    jest.clearAllMocks();
   });
 
   describe('Service Creation', () => {
@@ -493,6 +511,7 @@ describe('ErrorService', () => {
       await service.reportError(error);
 
       expect(debugSpy).not.toHaveBeenCalled();
+      expect(Sentry.captureException).not.toHaveBeenCalled();
     });
 
     it('should report when Sentry enabled', async () => {
@@ -510,9 +529,9 @@ describe('ErrorService', () => {
 
       await service.reportError(error);
 
+      expect(Sentry.captureException).toHaveBeenCalledWith(error);
       expect(debugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Would report to Sentry'),
-        expect.any(String),
+        expect.stringContaining('Error reported to Sentry'),
       );
     });
 
@@ -527,17 +546,17 @@ describe('ErrorService', () => {
       service = module.get<ErrorService>(ErrorService);
 
       const errorSpy = jest.spyOn(service['logger'], 'error');
-      const debugSpy = jest
-        .spyOn(service['logger'], 'debug')
-        .mockImplementation(() => {
-          throw new Error('Sentry connection failed');
-        });
+
+      // Mock Sentry to throw an error
+      (Sentry.captureException as jest.Mock).mockImplementationOnce(() => {
+        throw new Error('Sentry connection failed');
+      });
 
       const error = AppError.critical(ERROR_CODES.DATABASE_ERROR);
       await service.reportError(error);
 
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to report error'),
+        expect.stringContaining('Failed to report error to Sentry'),
         expect.any(Error),
       );
     });
@@ -552,16 +571,13 @@ describe('ErrorService', () => {
       }).compile();
       service = module.get<ErrorService>(ErrorService);
 
-      const debugSpy = jest.spyOn(service['logger'], 'debug');
       const error = AppError.critical(ERROR_CODES.DATABASE_ERROR);
       const context = { dbHost: 'localhost', query: 'SELECT *' };
 
       await service.reportError(error, context);
 
-      expect(debugSpy).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.stringContaining('dbHost'),
-      );
+      expect(Sentry.withScope).toHaveBeenCalled();
+      expect(Sentry.captureException).toHaveBeenCalledWith(error);
     });
   });
 

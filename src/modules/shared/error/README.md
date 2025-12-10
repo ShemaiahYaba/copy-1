@@ -1,46 +1,40 @@
-# Error Module
+# Error Handling Module
 
-A production-ready, unified error handling system for NestJS applications. Provides standardized error responses, automatic frontend notifications, and comprehensive error tracking with security-first design.
+A production-ready, unified error handling system for NestJS applications. Provides standardized error responses, automatic frontend notifications, comprehensive error tracking with Sentry integration, and security-first design.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Features](#features)
 - [Architecture](#architecture)
 - [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Error Codes Reference](#error-codes-reference)
-- [Configuration](#configuration)
-- [Error Classes Guide](#error-classes-guide)
-- [Usage Examples](#usage-examples)
-- [API Documentation](#api-documentation)
-- [Security Considerations](#security-considerations)
+- [Getting Started](#getting-started)
+- [Standard Error Codes](#standard-error-codes)
+- [Error Classes Reference](#error-classes-reference)
+- [Implementation Examples](#implementation-examples)
+- [API Reference](#api-reference)
+- [Error Tracking with Sentry](#error-tracking-with-sentry)
+- [Security and Error Handling](#security-and-error-handling)
 - [Testing](#testing)
-- [Troubleshooting](#troubleshooting)
-- [Migration Guide](#migration-guide)
 
----
-
-## ✨ Features
+## Features
 
 - **Unified Error Handling** - Global exception filter catches all errors
 - **Standardized Error Responses** - Consistent error format across the application
 - **Automatic Frontend Notifications** - Integrates with NotificationModule for real-time error alerts
+- **Sentry Integration** - Automatic error reporting with severity mapping and context enrichment
 - **Type-Safe Error Codes** - Centralized error code system with automatic message mapping
 - **Security-First** - Automatic sensitive data sanitization
-- **Configurable Behavior** - Control stack traces, logging, and notification strategies
+- **Configurable Behavior** - Control stack traces, logging, notification strategies, and Sentry reporting
 - **Multiple Error Types** - AppError, ValidationError, BusinessError for different use cases
 - **HTTP Status Mapping** - Automatic mapping of error codes to appropriate HTTP status codes
-- **External Error Tracking** - Sentry integration support for critical errors
 - **Full TypeScript Support** - Comprehensive type definitions
 - **Extensive Test Coverage** - >85% coverage with 201 passing tests
 
----
+## Architecture
 
-## 🏗️ Architecture
+### System Architecture
 
-### Core Components
-
-```
+```typescript
 error/
 ├── classes/                    # Error class definitions
 │   ├── app-error.class.ts     # Base application error
@@ -48,7 +42,7 @@ error/
 │   └── business-error.class.ts
 ├── filters/                    # Exception filters
 │   └── app-error/
-│       └── app-error.filter.ts # Global error handler
+│       └── app-error.filter.ts # Global error handler with Sentry
 ├── dto/                        # Data transfer objects
 │   ├── error-config.dto.ts    # Configuration options
 │   └── error-response.dto.ts  # Response format
@@ -58,25 +52,24 @@ error/
 └── error.module.ts            # Module definition
 ```
 
-### How It Works
+### Workflow
 
 1. **Error Thrown** - Any error occurs in your application
-2. **Global Filter Catches** - `AppErrorFilter` intercepts the error
-3. **Error Processing** - `ErrorService.processError()` transforms the error
-4. **Notification** - If operational, sends notification to frontend
-5. **Reporting** - If critical, reports to external service (Sentry)
-6. **Response** - Returns standardized JSON error response
+2. **Global Filter Catches** - `AppErrorFilter` intercepts the error (with `@SentryExceptionCaptured()` decorator)
+3. **Automatic Sentry Reporting** - Critical errors automatically reported to Sentry
+4. **Error Processing** - `ErrorService.processError()` transforms the error
+5. **Notification** - If operational, sends notification to frontend
+6. **Manual Reporting** - Additional context can be added via `reportError()` or `reportMessage()`
+7. **Response** - Returns standardized JSON error response
 
----
-
-## 📦 Installation
+## Installation
 
 ### Required Dependencies
 
 All dependencies should already be installed as part of your NestJS project:
 
 ```bash
-pnpm add @nestjs/common class-validator class-transformer uuid@9
+pnpm add @nestjs/common class-validator class-transformer uuid@9 @sentry/nestjs
 ```
 
 ### Development Dependencies
@@ -85,11 +78,27 @@ pnpm add @nestjs/common class-validator class-transformer uuid@9
 pnpm add -D @types/uuid
 ```
 
----
+## Getting Started
 
-## 🚀 Quick Start
+### 1. Configure Sentry (Optional)
 
-### 1. Import the Module
+In your `main.ts`:
+
+```typescript
+import * as Sentry from '@sentry/nestjs';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
+
+// Initialize Sentry before creating NestJS app
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  integrations: [nodeProfilingIntegration()],
+  tracesSampleRate: 1.0,
+  profilesSampleRate: 1.0,
+  environment: process.env.NODE_ENV,
+});
+```
+
+### 2. Import the Module
 
 In your `app.module.ts`:
 
@@ -108,14 +117,14 @@ import { ErrorNotificationStrategy } from './modules/shared/error/dto/error-conf
       enableLogging: false,
     }),
 
-    // Then ErrorModule
+    // Then ErrorModule with Sentry enabled
     ErrorModule.register({
       includeStackTrace: process.env.NODE_ENV === 'development',
       notifyFrontend: true,
       notificationStrategy: ErrorNotificationStrategy.OPERATIONAL,
       logErrors: true,
       captureContext: true,
-      enableSentry: process.env.NODE_ENV === 'production',
+      enableSentry: process.env.NODE_ENV === 'production', // Enable in production
     }),
 
     // Your other modules...
@@ -124,7 +133,7 @@ import { ErrorNotificationStrategy } from './modules/shared/error/dto/error-conf
 export class AppModule {}
 ```
 
-### 2. Use in Services
+### 3. Use in Services
 
 ```typescript
 import { Injectable } from '@nestjs/common';
@@ -136,6 +145,7 @@ export class ProjectService {
     const project = await this.projectRepo.findOne(id);
 
     if (!project) {
+      // Automatically reported to Sentry if critical
       throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'Project not found', {
         projectId: id,
       });
@@ -146,7 +156,7 @@ export class ProjectService {
 }
 ```
 
-### 3. Frontend Receives Notifications
+### 4. Frontend Receives Notifications
 
 When errors occur, connected clients automatically receive notifications:
 
@@ -160,125 +170,65 @@ socket.on('notification', (notification) => {
 });
 ```
 
----
-
-## 📖 Error Codes Reference
+## Standard Error Codes
 
 ### General Errors (1000-1999)
 
-| Code       | Message                           | HTTP Status |
-| ---------- | --------------------------------- | ----------- |
-| `ERR_1000` | An internal server error occurred | 500         |
-| `ERR_1001` | An unknown error occurred         | 500         |
-| `ERR_1002` | Service temporarily unavailable   | 503         |
-| `ERR_1003` | Request timeout                   | 504         |
+| Code | Message | HTTP Status |
+| \***\*\*\*\***- | **\*\***\*\*\*\***\*\***\***\*\***\*\*\*\***\*\*** | \***\*\*\*\***-- |
+| `ERR_1000` | An internal server error occurred | 500 |
+| `ERR_1001` | An unknown error occurred | 500 |
+| `ERR_1002` | Service temporarily unavailable | 503 |
+| `ERR_1003` | Request timeout | 504 |
 
 ### Validation Errors (2000-2999)
 
-| Code       | Message                          | HTTP Status |
-| ---------- | -------------------------------- | ----------- |
-| `ERR_2000` | Validation failed                | 400         |
-| `ERR_2001` | Invalid input provided           | 400         |
-| `ERR_2002` | Required field is missing        | 400         |
-| `ERR_2003` | Invalid format                   | 400         |
-| `ERR_2004` | Value is out of acceptable range | 400         |
+| Code | Message | HTTP Status |
+| \***\*\*\*\***- | **\*\***\*\***\*\***\*\***\*\***\*\***\*\***-- | \***\*\*\*\***-- |
+| `ERR_2000` | Validation failed | 400 |
+| `ERR_2001` | Invalid input provided | 400 |
+| `ERR_2002` | Required field is missing | 400 |
+| `ERR_2003` | Invalid format | 400 |
+| `ERR_2004` | Value is out of acceptable range | 400 |
 
 ### Authentication Errors (3000-3999)
 
-| Code       | Message                          | HTTP Status |
-| ---------- | -------------------------------- | ----------- |
-| `ERR_3000` | Unauthorized access              | 401         |
-| `ERR_3001` | Invalid authentication token     | 401         |
-| `ERR_3002` | Authentication token has expired | 401         |
-| `ERR_3003` | Insufficient permissions         | 403         |
-| `ERR_3004` | Invalid credentials              | 401         |
+| Code | Message | HTTP Status |
+| \***\*\*\*\***- | **\*\***\*\***\*\***\*\***\*\***\*\***\*\***-- | \***\*\*\*\***-- |
+| `ERR_3000` | Unauthorized access | 401 |
+| `ERR_3001` | Invalid authentication token | 401 |
+| `ERR_3002` | Authentication token has expired | 401 |
+| `ERR_3003` | Insufficient permissions | 403 |
+| `ERR_3004` | Invalid credentials | 401 |
 
 ### Resource Errors (4000-4999)
 
-| Code       | Message                      | HTTP Status |
-| ---------- | ---------------------------- | ----------- |
-| `ERR_4000` | Resource not found           | 404         |
-| `ERR_4001` | Requested resource not found | 404         |
-| `ERR_4002` | Resource already exists      | 409         |
-| `ERR_4003` | Resource conflict            | 409         |
+| Code | Message | HTTP Status |
+| \***\*\*\*\***- | \***\*\*\*\*\*\*\***\*\*\*\***\*\*\*\*\*\*\***- | \***\*\*\*\***-- |
+| `ERR_4000` | Resource not found | 404 |
+| `ERR_4001` | Requested resource not found | 404 |
+| `ERR_4002` | Resource already exists | 409 |
+| `ERR_4003` | Resource conflict | 409 |
 
 ### Business Logic Errors (5000-5999)
 
-| Code       | Message                     | HTTP Status |
-| ---------- | --------------------------- | ----------- |
-| `ERR_5000` | Business rule violation     | 422         |
-| `ERR_5001` | Invalid state for operation | 422         |
-| `ERR_5002` | Operation not allowed       | 403         |
-| `ERR_5003` | Quota exceeded              | 429         |
+| Code | Message | HTTP Status |
+| \***\*\*\*\***- | \***\*\*\*\*\*\*\***\*\*\*\***\*\*\*\*\*\*\*** | \***\*\*\*\***-- |
+| `ERR_5000` | Business rule violation | 422 |
+| `ERR_5001` | Invalid state for operation | 422 |
+| `ERR_5002` | Operation not allowed | 403 |
+| `ERR_5003` | Quota exceeded | 429 |
 
 ### External Service Errors (6000-6999)
 
-| Code       | Message                | HTTP Status |
-| ---------- | ---------------------- | ----------- |
-| `ERR_6000` | External service error | 502         |
-| `ERR_6001` | API request failed     | 502         |
-| `ERR_6002` | Database error         | 500         |
-| `ERR_6003` | Cache error            | 500         |
+| Code | Message | HTTP Status |
+| \***\*\*\*\***- | \***\*\*\*\*\***\*\***\*\*\*\*\***- | \***\*\*\*\***-- |
+| `ERR_6000` | External service error | 502 |
+| `ERR_6001` | API request failed | 502 |
+| `ERR_6002` | Database error | 500 |
+| `ERR_6003` | Cache error | 500 |
 
----
-
-## ⚙️ Configuration
-
-### Configuration Options
-
-```typescript
-export class ErrorConfigDto {
-  includeStackTrace: boolean; // Show stack traces (dev only)
-  notifyFrontend: boolean; // Send error notifications
-  notificationStrategy: enum; // When to notify (ALL, OPERATIONAL, CRITICAL, NONE)
-  logErrors: boolean; // Log errors
-  captureContext: boolean; // Include request context
-  enableSentry?: boolean; // External error tracking
-}
-```
-
-### Configuration Examples
-
-#### Development Setup
-
-```typescript
-ErrorModule.register({
-  includeStackTrace: true, // Show full stack traces
-  notifyFrontend: true, // Notify on all errors
-  notificationStrategy: ErrorNotificationStrategy.ALL,
-  logErrors: true, // Verbose logging
-  captureContext: true,
-  enableSentry: false, // No external tracking in dev
-});
-```
-
-#### Production Setup
-
-```typescript
-ErrorModule.register({
-  includeStackTrace: false, // Hide stack traces
-  notifyFrontend: true,
-  notificationStrategy: ErrorNotificationStrategy.OPERATIONAL,
-  logErrors: true,
-  captureContext: true,
-  enableSentry: true, // Report to Sentry
-});
-```
-
-#### Testing Setup
-
-```typescript
-ErrorModule.register({
-  includeStackTrace: true,
-  notifyFrontend: false, // No notifications in tests
-  notificationStrategy: ErrorNotificationStrategy.NONE,
-  logErrors: false, // Quiet tests
-});
-```
-
----
-
-## 📚 Error Classes Guide
+## Error Classes Reference
 
 ### AppError
 
@@ -288,16 +238,16 @@ ErrorModule.register({
 // Basic usage
 throw new AppError(ERROR_CODES.NOT_FOUND, 'Project not found');
 
-// With context
+// With context (automatically sanitized before Sentry)
 throw new AppError(ERROR_CODES.UNAUTHORIZED, 'Access denied', {
   userId: '123',
   resource: 'project',
 });
 
-// High severity
+// High severity (reported to Sentry as 'error')
 throw AppError.high(ERROR_CODES.DATABASE_ERROR, 'Database connection failed');
 
-// Critical error (non-operational)
+// Critical error (non-operational, reported to Sentry as 'fatal')
 throw AppError.critical(ERROR_CODES.INTERNAL_SERVER_ERROR, 'System failure');
 ```
 
@@ -342,9 +292,7 @@ throw BusinessError.invalidState('Cannot approve rejected document', {
 throw BusinessError.notAllowed('delete user', 'User has active subscriptions');
 ```
 
----
-
-## 💡 Usage Examples
+## Implementation Examples
 
 ### In Controllers
 
@@ -360,6 +308,7 @@ export class ProjectController {
   @Get(':id')
   async getOne(@Param('id') id: string) {
     // AppError automatically caught by global filter
+    // Critical errors automatically reported to Sentry
     return this.projectService.getProject(id);
   }
 }
@@ -404,11 +353,14 @@ export class UserService {
 ```typescript
 @Injectable()
 export class PaymentService {
+  constructor(private readonly errorService: ErrorService) {}
+
   async processPayment(amount: number) {
     try {
       await this.paymentGateway.charge(amount);
     } catch (error) {
-      throw AppError.critical(
+      // Create critical error (automatically reported to Sentry)
+      const criticalError = AppError.critical(
         ERROR_CODES.EXTERNAL_SERVICE_ERROR,
         'Payment processing failed',
         {
@@ -417,6 +369,14 @@ export class PaymentService {
           originalError: error.message,
         },
       );
+
+      // Optionally add more context before throwing
+      await this.errorService.reportError(criticalError, {
+        attemptNumber: 1,
+        timestamp: new Date().toISOString(),
+      });
+
+      throw criticalError;
     }
   }
 }
@@ -438,14 +398,21 @@ export class OrderService {
       );
     }
   }
+
+  async logCustomMessage() {
+    // Report custom message to Sentry
+    this.errorService.reportMessage(
+      'Payment gateway timeout threshold exceeded',
+      'warning',
+      { gateway: 'stripe', averageDelay: 3000, threshold: 2000 },
+    );
+  }
 }
 ```
 
----
+## API Reference
 
-## 📖 API Documentation
-
-### AppError Class
+### AppError Class Reference
 
 #### Constructor
 
@@ -472,9 +439,9 @@ AppError.critical(code, message?, context?)  // CRITICAL severity (non-operation
 error.toJSON(): IErrorResponse  // Convert to JSON format
 ```
 
-### ValidationError Class
+### ValidationError Class Reference
 
-#### Constructor
+#### Constructor (VECR)
 
 ```typescript
 new ValidationError(
@@ -483,44 +450,360 @@ new ValidationError(
 )
 ```
 
-#### Static Methods
+#### Static Methods (VECR)
 
 ```typescript
 ValidationError.fromValidationErrors(classValidatorErrors);
 ```
 
-### BusinessError Class
+### BusinessError Class Reference
 
-#### Constructor
+#### Constructor (BECR)
 
 ```typescript
 new BusinessError(message: string, context?: Record<string, any>)
 ```
 
-#### Static Methods
+#### Static Methods (BECR)
 
 ```typescript
 BusinessError.invalidState(message, context?)
 BusinessError.notAllowed(operation, reason?)
 ```
 
-### ErrorService Methods
+### ErrorService Method Reference
+
+#### ErrorService.processError()
+
+Transform error to standard format.
+
+**Parameters:**
+
+- `error`: any - The error to process
+- `request?`: any - Optional request context
+
+**Returns:** ErrorResponseDto
+
+**Example:**
 
 ```typescript
-processError(error, request?): ErrorResponseDto     // Transform error to standard format
-shouldNotify(error): boolean                        // Determine if notification should be sent
-logError(error, context?): void                     // Log error with sanitized context
-reportError(error, context?): Promise<void>         // Report to external service
-createError(code, message?, context?): AppError     // Factory method for creating errors
+const errorResponse = service.processError(error, req);
 ```
 
 ---
 
-## 🔒 Security Considerations
+#### `shouldNotify(error): boolean`
+
+Determine if notification should be sent based on strategy.
+
+**Parameters:**
+
+- `error`: AppError - The error to check
+
+**Returns:** boolean
+
+**Example:**
+
+```typescript
+if (service.shouldNotify(error)) {
+  // Send notification
+}
+```
+
+---
+
+#### ErrorService.logError()
+
+Log error with sanitized context.
+
+**Parameters:**
+
+- `error`: any - The error to log
+- `context?`: Record<string, any> - Additional context (will be sanitized)
+
+**Example:**
+
+```typescript
+service.logError(error, { userId: '123', action: 'payment' });
+```
+
+---
+
+#### ErrorService.reportError()
+
+Report error to Sentry with proper context and severity mapping.
+
+**Parameters:**
+
+- `error`: any - The error to report
+- `context?`: Record<string, any> - Additional context (will be sanitized)
+
+**Returns:** `Promise<void>`
+
+**Example:**
+
+```typescript
+await service.reportError(error, {
+  userId: '123',
+  correlationId: 'abc-123',
+  endpoint: '/api/payments',
+});
+```
+
+**Sentry Tags Added:**
+
+- `error_code` - The error code (if AppError)
+- `is_operational` - Whether error is operational
+- `severity` - Error severity level
+- `request_path` - Request path (if provided)
+- `request_method` - Request method (if provided)
+- `correlation_id` - Correlation ID (if provided)
+
+---
+
+#### `reportMessage(message, level?, context?): void`
+
+Report custom message to Sentry.
+
+**Parameters:**
+
+- `message`: string - The message to report
+- `level?`: SeverityLevel - Sentry severity level (default: 'info')
+- `context?`: Record<string, any> - Additional context
+
+**Example:**
+
+```typescript
+service.reportMessage('Payment gateway experiencing delays', 'warning', {
+  gateway: 'stripe',
+  averageDelay: 3000,
+  threshold: 2000,
+});
+```
+
+---
+
+#### `createError(code, message?, context?): AppError`
+
+Factory method for creating AppError instances.
+
+**Parameters:**
+
+- `code`: ErrorCode - The error code
+- `message?`: string - Custom error message
+- `context?`: Record<string, any> - Additional context
+
+**Returns:** AppError
+
+**Example:**
+
+```typescript
+const error = service.createError(ERROR_CODES.NOT_FOUND, 'Resource not found', {
+  resourceId: '456',
+});
+```
+
+---
+
+## Error Tracking with Sentry
+
+### Overview
+
+The Error Module provides seamless integration with Sentry for production error tracking. All errors caught by the global filter are automatically reported to Sentry via the `@SentryExceptionCaptured()` decorator.
+
+### Setup
+
+#### 1. Install Sentry
+
+```bash
+pnpm add @sentry/nestjs @sentry/profiling-node
+```
+
+#### 2. Initialize in main.ts
+
+```typescript
+import * as Sentry from '@sentry/nestjs';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
+
+// Initialize Sentry before creating NestJS app
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  integrations: [nodeProfilingIntegration()],
+  tracesSampleRate: 1.0,
+  profilesSampleRate: 1.0,
+  environment: process.env.NODE_ENV,
+
+  // Optional: Filter out sensitive data
+  beforeSend(event) {
+    // Modify event before sending
+    return event;
+  },
+});
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  // ... rest of bootstrap
+}
+```
+
+#### 3. Enable in ErrorModule
+
+```typescript
+ErrorModule.register({
+  enableSentry: process.env.NODE_ENV === 'production',
+  // ... other config
+});
+```
+
+### Automatic Error Reporting
+
+The global exception filter uses the `@SentryExceptionCaptured()` decorator to automatically report all exceptions:
+
+```typescript
+@Catch()
+export class AppErrorFilter implements ExceptionFilter {
+  @SentryExceptionCaptured() // Automatically reports to Sentry
+  catch(exception: unknown, host: ArgumentsHost) {
+    // Error processing logic
+  }
+}
+```
+
+**What gets reported automatically:**
+
+- All uncaught exceptions
+- HTTP exceptions
+- AppError instances (with metadata)
+- ValidationError instances
+- BusinessError instances
+- Standard JavaScript errors
+
+### Manual Error Reporting
+
+For additional context or custom reporting:
+
+```typescript
+@Injectable()
+export class PaymentService {
+  constructor(private errorService: ErrorService) {}
+
+  async processPayment(amount: number) {
+    try {
+      await this.gateway.charge(amount);
+    } catch (error) {
+      // Add custom context before reporting
+      await this.errorService.reportError(error, {
+        paymentAmount: amount,
+        gateway: 'stripe',
+        attemptNumber: 1,
+        userId: this.getCurrentUserId(),
+      });
+
+      throw error;
+    }
+  }
+}
+```
+
+### Severity Level Mapping
+
+The module automatically maps AppError severity to Sentry severity levels:
+
+| AppError Severity | Sentry Level | When to Use |
+| **\*\***\*\*\***\*\***-- | \***\*\*\*\*\*\*\*** | **\*\*\*\***\*\*\*\***\*\*\*\***\*\***\*\*\*\***\*\*\*\***\*\*\*\*** |
+| LOW | info | Minor validation errors, warnings |
+| MEDIUM | warning | Business logic violations, expected errors |
+| HIGH | error | Service failures, external API errors |
+| CRITICAL | fatal | System failures, data corruption |
+
+**Example:**
+
+```typescript
+// Reported to Sentry as 'info'
+throw new AppError(
+  ERROR_CODES.VALIDATION_ERROR,
+  'Invalid input',
+  undefined,
+  ErrorSeverity.LOW,
+);
+
+// Reported to Sentry as 'fatal'
+throw AppError.critical(ERROR_CODES.DATABASE_ERROR, 'Database connection lost');
+```
+
+### Context Enrichment
+
+The ErrorService automatically enriches Sentry reports with:
+
+**Error Context:**
+
+```typescript
+{
+  error_code: 'ERR_4001',
+  is_operational: 'true',
+  severity: 'HIGH',
+  correlation_id: 'abc-123',
+  request_path: '/api/projects',
+  request_method: 'POST'
+}
+```
+
+**AppError Context:**
+
+```typescript
+{
+  app_error_context: {
+    projectId: '123',
+    userId: '456',
+    // ... sanitized context from AppError
+  }
+}
+```
+
+**Request Context (if available):**
+
+```typescript
+{
+  request_path: '/api/projects',
+  request_method: 'POST',
+  correlation_id: 'abc-123'
+}
+```
+
+### Custom Message Reporting
+
+Report custom messages or warnings to Sentry:
+
+```typescript
+@Injectable()
+export class MonitoringService {
+  constructor(private errorService: ErrorService) {}
+
+  checkGatewayHealth() {
+    const avgDelay = this.getAverageDelay();
+
+    if (avgDelay > 2000) {
+      // Report warning to Sentry
+      this.errorService.reportMessage(
+        'Payment gateway experiencing delays',
+        'warning',
+        {
+          gateway: 'stripe',
+          averageDelay: avgDelay,
+          threshold: 2000,
+          affectedRequests: 15,
+        },
+      );
+    }
+  }
+}
+```
 
 ### Sensitive Data Sanitization
 
-The ErrorService automatically redacts sensitive fields:
+The ErrorService automatically sanitizes sensitive data before sending to Sentry:
+
+**Sanitized Fields:**
 
 - `password`
 - `token`
@@ -543,27 +826,187 @@ const context = {
 
 service.logError(error, context);
 // Logs: { userId: '123', password: '***REDACTED***', email: 'user@example.com' }
+
+await service.reportError(error, context);
+// Sent to Sentry: { userId: '123', password: '***REDACTED***', email: 'user@example.com' }
 ```
 
-### Stack Trace Control
+### Filtering Errors
+
+You can filter what gets sent to Sentry by configuring notification strategy:
+
+```typescript
+ErrorModule.register({
+  enableSentry: true,
+  notificationStrategy: ErrorNotificationStrategy.CRITICAL, // Only critical
+});
+```
+
+Or implement custom filtering in Sentry's `beforeSend`:
+
+```typescript
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  beforeSend(event, hint) {
+    // Don't send validation errors to Sentry
+    if (hint.originalException?.code?.startsWith('ERR_2')) {
+      return null;
+    }
+    return event;
+  },
+});
+```
+
+### Best Practices for Error Handling in Applications
+
+1. **Use severity levels appropriately**
+
+   ```typescript
+   // Good
+   throw new AppError(
+     ERROR_CODES.VALIDATION_ERROR,
+     msg,
+     ctx,
+     ErrorSeverity.LOW,
+   );
+
+   // Bad - validation error shouldn't be CRITICAL
+   throw AppError.critical(ERROR_CODES.VALIDATION_ERROR, msg);
+   ```
+
+2. **Add meaningful context**
+
+   ```typescript
+   // Good
+   throw new AppError(ERROR_CODES.PAYMENT_FAILED, 'Payment failed', {
+     amount: 100,
+     currency: 'USD',
+     gateway: 'stripe',
+     attemptNumber: 3,
+   });
+
+   // Bad - no context
+   throw new AppError(ERROR_CODES.PAYMENT_FAILED);
+   ```
+
+3. **Use reportMessage for monitoring**
+
+   ```typescript
+   // Monitor thresholds
+   if (queueLength > 1000) {
+     errorService.reportMessage('Queue threshold exceeded', 'warning', {
+       queueLength,
+       threshold: 1000,
+     });
+   }
+   ```
+
+4. **Never log sensitive data**
+
+   ```typescript
+   // Good - sensitive data automatically sanitized
+   errorService.reportError(error, { userId, password }); // password redacted
+
+   // Bad - exposing in message
+   throw new AppError(ERROR_CODES.AUTH_FAILED, `Failed with password: ${pwd}`);
+   ```
+
+5. **Log full details server-side, show generic messages to users**
+
+   ```typescript
+   // Good
+   errorService.logError(error, { userId, action: 'payment' });
+   throw new AppError(ERROR_CODES.PAYMENT_FAILED, 'Payment failed');
+
+   // Bad - exposing internal details
+   throw new AppError(
+     ERROR_CODES.PAYMENT_FAILED,
+     `Failed with error: ${error.message}`,
+   );
+   ```
+
+6. **Review Sentry reports regularly for accidentally leaked data**
+
+   ```typescript
+   // Good
+   Sentry.init({
+     beforeSend(event) {
+       // Remove PII
+       if (event.user) {
+         delete event.user.email;
+         delete event.user.ip_address;
+       }
+       return event;
+     },
+   });
+   ```
+
+7. **Configure Sentry data scrubbing rules**
+
+   ```typescript
+   // Good
+   Sentry.init({
+     dsn: process.env.SENTRY_DSN,
+     beforeSend(event) {
+       // Remove PII
+       if (event.user) {
+         delete event.user.email;
+         delete event.user.ip_address;
+       }
+       return event;
+     },
+   });
+   ```
+
+---
+
+## Security and Error Handling
+
+### Sensitive Data Sanitization (SAEH)
+
+The ErrorService automatically redacts sensitive fields before logging or reporting to Sentry:
+
+**Sanitized Fields:**
+
+- `password`
+- `token`
+- `apiKey`
+- `secret`
+- `creditCard`
+- `ssn`
+- `connectionString`
+- `authorization`
+- `cookie`
+
+**Example:**
+
+```typescript
+const context = {
+  userId: '123',
+  password: 'secret123', // Will be redacted
+  email: 'user@example.com',
+};
+
+service.logError(error, context);
+// Logs: { userId: '123', password: '***REDACTED***', email: 'user@example.com' }
+
+await service.reportError(error, context);
+// Sent to Sentry: { userId: '123', password: '***REDACTED***', email: 'user@example.com' }
+```
+
+### Security: Stack Trace Control
 
 **Never expose stack traces in production:**
 
 ```typescript
-// Production
 ErrorModule.register({
-  includeStackTrace: false, // ✅ Safe
-});
-
-// Development
-ErrorModule.register({
-  includeStackTrace: true, // ✅ OK for debugging
+  includeStackTrace: process.env.NODE_ENV === 'development', // Only in dev
 });
 ```
 
-### Error Message Safety
+### Security: Error Message Safety
 
-**❌ Bad (exposes internals):**
+**Bad (exposes internals):**
 
 ```typescript
 throw new AppError(
@@ -572,7 +1015,7 @@ throw new AppError(
 );
 ```
 
-**✅ Good (generic, safe):**
+**Good (generic, safe):**
 
 ```typescript
 throw new AppError(
@@ -582,17 +1025,53 @@ throw new AppError(
 );
 ```
 
-### Best Practices
+### Security: Sentry Data Privacy
 
-1. ✅ **Never** include passwords, tokens, or PII in error messages
-2. ✅ **Always** set `includeStackTrace: false` in production
-3. ✅ **Use** specific error codes instead of exposing internal details
-4. ✅ **Sanitize** user input before including in context
-5. ✅ **Log** full details server-side, show generic messages to users
+**Best practices for Sentry:**
+
+1. **Use beforeSend to scrub data:**
+
+   ```typescript
+   Sentry.init({
+     beforeSend(event) {
+       // Remove PII
+       if (event.user) {
+         delete event.user.email;
+         delete event.user.ip_address;
+       }
+       return event;
+     },
+   });
+   ```
+
+2. **Enable Data Scrubbing in Sentry dashboard:**
+   - Go to Settings > Security & Privacy
+   - Enable "Data Scrubbing"
+   - Add custom regex patterns
+
+3. **Use environment variables for sensitive config:**
+
+   ```typescript
+   // Good
+   dsn: process.env.SENTRY_DSN;
+
+   // Bad
+   dsn: 'https://public-key@sentry.io/project-id';
+   ```
+
+### Best Practices for Error Handling in Applications ()
+
+1. **Never** include passwords, tokens, or PII in error messages
+2. **Always** set `includeStackTrace: false` in production
+3. **Use** specific error codes instead of exposing internal details
+4. **Sanitize** user input before including in context
+5. **Log** full details server-side, show generic messages to users
+6. **Review** Sentry reports regularly for accidentally leaked data
+7. **Configure** Sentry data scrubbing rules
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ### Run Tests
 
@@ -614,13 +1093,69 @@ pnpm test src/modules/shared/error
 pnpm test -- --coverage src/modules/shared/error
 ```
 
-### Test Results
+### Test Coverage
 
-```
+```text
 Test Suites: 9 passed, 9 total
 Tests:       201 passed, 201 total
 Snapshots:   0 total
 Time:        ~8s
+```
+
+### Testing Error Reporting
+
+Mock Sentry in your tests:
+
+```typescript
+import * as Sentry from '@sentry/nestjs';
+
+jest.mock('@sentry/nestjs', () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  withScope: jest.fn((callback) => {
+    const mockScope = {
+      setLevel: jest.fn(),
+      setTag: jest.fn(),
+      setContext: jest.fn(),
+    };
+    callback(mockScope);
+  }),
+}));
+
+describe('Error Reporting', () => {
+  it('should report critical errors to Sentry', async () => {
+    const error = AppError.critical(
+      ERROR_CODES.DATABASE_ERROR,
+      'Connection failed',
+    );
+
+    await errorService.reportError(error);
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(error);
+    expect(Sentry.withScope).toHaveBeenCalled();
+  });
+
+  it('should add proper tags to Sentry', async () => {
+    const error = new AppError(ERROR_CODES.VALIDATION_ERROR, 'Invalid input', {
+      field: 'email',
+    });
+
+    await errorService.reportError(error);
+
+    const scopeCallback = (Sentry.withScope as jest.Mock).mock.calls[0][0];
+    const mockScope = {
+      setLevel: jest.fn(),
+      setTag: jest.fn(),
+      setContext: jest.fn(),
+    };
+
+    scopeCallback(mockScope);
+
+    expect(mockScope.setTag).toHaveBeenCalledWith('error_code', error.code);
+    expect(mockScope.setTag).toHaveBeenCalledWith('is_operational', 'true');
+    expect(mockScope.setTag).toHaveBeenCalledWith('severity', error.severity);
+  });
+});
 ```
 
 ### Writing Tests
@@ -640,6 +1175,7 @@ describe('My Feature', () => {
           includeStackTrace: true,
           notifyFrontend: false, // Disable in tests
           logErrors: false, // Quiet tests
+          enableSentry: false, // No Sentry in tests
         }),
       ],
     }).compile();
@@ -758,6 +1294,58 @@ import { AppError, ERROR_CODES } from './modules/shared/error';
 }
 ```
 
+#### 6. Sentry Not Reporting Errors
+
+**Problem:** Errors not appearing in Sentry dashboard
+
+**Solutions:**
+
+```typescript
+// 1. Verify Sentry is initialized
+// In main.ts, BEFORE app creation
+Sentry.init({
+  dsn: process.env.SENTRY_DSN, // ✅ Check DSN is set
+  environment: process.env.NODE_ENV,
+});
+
+// 2. Check enableSentry is true
+ErrorModule.register({
+  enableSentry: true, // ✅ Must be true
+});
+
+// 3. Verify DSN is valid
+console.log('Sentry DSN:', process.env.SENTRY_DSN);
+
+// 4. Test manually
+Sentry.captureMessage('Test from bootstrap');
+```
+
+#### 7. Sentry Reporting Too Many Errors
+
+**Problem:** Sentry quota exceeded with validation errors
+
+**Solution:**
+
+```typescript
+// Filter out low-severity errors
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  beforeSend(event, hint) {
+    // Don't send validation errors (2000-2999)
+    if (hint.originalException?.code?.startsWith('ERR_2')) {
+      return null;
+    }
+    return event;
+  },
+});
+
+// Or adjust notification strategy
+ErrorModule.register({
+  enableSentry: true,
+  notificationStrategy: ErrorNotificationStrategy.CRITICAL, // Only critical
+});
+```
+
 ---
 
 ## 📊 Error Response Format
@@ -858,6 +1446,50 @@ private extractStatusCode(exception: unknown, errorCode: ErrorCode): number {
 }
 ```
 
+#### 4. Sentry Integration Added
+
+**New in this version:**
+
+```typescript
+// Automatic reporting via decorator
+@SentryExceptionCaptured()
+catch(exception: unknown, host: ArgumentsHost) {
+  // ...
+}
+
+// New methods
+errorService.reportError(error, context);
+errorService.reportMessage(message, level, context);
+```
+
+**Migration steps:**
+
+1. Install Sentry dependencies:
+
+   ```bash
+   pnpm add @sentry/nestjs @sentry/profiling-node
+   ```
+
+2. Initialize Sentry in `main.ts`:
+
+   ```typescript
+   import * as Sentry from '@sentry/nestjs';
+
+   Sentry.init({
+     dsn: process.env.SENTRY_DSN,
+     // ... config
+   });
+   ```
+
+3. Enable in ErrorModule config:
+
+   ```typescript
+   ErrorModule.register({
+     enableSentry: process.env.NODE_ENV === 'production',
+     // ... other config
+   });
+   ```
+
 ---
 
 ## 🎯 Best Practices
@@ -870,8 +1502,10 @@ private extractStatusCode(exception: unknown, errorCode: ErrorCode): number {
 6. ✅ **Never expose internal details** - Use generic messages for users
 7. ✅ **Test error paths** - Don't just test happy paths
 8. ✅ **Log comprehensive details** - But only server-side
-9. ✅ **Monitor error rates** - Track and alert on spikes
+9. ✅ **Monitor error rates** - Track and alert on spikes via Sentry
 10. ✅ **Document custom error codes** - Keep this README updated
+11. ✅ **Use Sentry wisely** - Filter out noise, focus on actionable errors
+12. ✅ **Review Sentry regularly** - Check for patterns and recurring issues
 
 ---
 
@@ -881,7 +1515,8 @@ For issues, questions, or contributions:
 
 - **Issues:** [GitHub Issues](https://github.com/your-repo/issues)
 - **Documentation:** This README
-- **Email:** support@your-domain.com
+- **Email:** [support@your-domain.com](mailto:support@your-domain.com)
+- **Sentry Dashboard:** [Your Sentry Project](https://sentry.io/organizations/your-org/projects/your-project/)
 
 ---
 
@@ -898,9 +1533,11 @@ Built with:
 - [NestJS](https://nestjs.com/)
 - [class-validator](https://github.com/typestack/class-validator)
 - [UUID v9](https://www.npmjs.com/package/uuid)
+- [Sentry](https://sentry.io/)
 
 ---
 
-**Last Updated:** November 2025  
-**Module Version:** 1.0.0  
-**Test Coverage:** 201/201 tests passing (100%)
+**Last Updated:** December 2025  
+**Module Version:** 2.0.0  
+**Test Coverage:** 201/201 tests passing (100%)  
+**Sentry Integration:** ✅ Fully Integrated

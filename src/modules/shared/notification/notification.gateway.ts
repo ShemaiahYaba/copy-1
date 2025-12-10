@@ -26,7 +26,7 @@ export class NotificationGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
-  server: Server;
+  server: Server; // This is definitely used, so we'll address the linter issue
 
   private readonly logger = new Logger(NotificationGateway.name);
   private activeConnections = 0;
@@ -69,16 +69,18 @@ export class NotificationGateway
           }
           this.emitNotification(notification);
         } catch (error) {
-          this.logger.error(`Error processing notification: ${error.message}`, {
-            stack: error.stack,
+          const err = error as Error;
+          this.logger.error(`Error processing notification: ${err.message}`, {
+            stack: err.stack,
             notificationId: notification?.id,
           });
         }
       });
     } catch (error) {
+      const err = error as Error;
       this.logger.error(
-        `Failed to initialize notification service subscription: ${error.message}`,
-        error.stack,
+        `Failed to initialize notification service subscription: ${err.message}`,
+        err.stack,
       );
     }
   }
@@ -178,9 +180,10 @@ export class NotificationGateway
 
       return true;
     } catch (error) {
+      const err = error as Error;
       this.logger.error(
-        `Error validating notification: ${error.message}`,
-        error.stack,
+        `Error validating notification: ${err.message}`,
+        err.stack,
       );
       return false;
     }
@@ -208,9 +211,15 @@ export class NotificationGateway
 
       const notificationString = JSON.stringify(notificationToEmit);
 
-      const emitResult = room
-        ? this.server.to(room).emit('notification', notificationToEmit)
-        : this.server.emit('notification', notificationToEmit);
+      // Fixed: More explicit typing to avoid unsafe assignment
+      let emitResult: boolean;
+      if (room && typeof room === 'string') {
+        emitResult = this.server
+          .to(room)
+          .emit('notification', notificationToEmit);
+      } else {
+        emitResult = this.server.emit('notification', notificationToEmit);
+      }
 
       // In test mode, wait for the emit to complete with a timeout
       if (this.isTestMode) {
@@ -222,11 +231,13 @@ export class NotificationGateway
           );
         });
 
-        Promise.race([timeoutPromise, Promise.resolve(emitResult)])
+        // Fixed: Handle the promise properly with void operator
+        void Promise.race([timeoutPromise, Promise.resolve(emitResult)])
           .catch((error) => {
+            const err = error as Error;
             this.logger.error(
               `Failed to emit notification within ${this.testTimeout}ms`,
-              { notificationId: notification.id, error: error.message },
+              { notificationId: notification.id, error: err.message },
             );
           })
           .finally(() => {
@@ -243,9 +254,10 @@ export class NotificationGateway
 
       this.logger.debug(`${logMessage} - ${notificationString}`);
     } catch (error) {
+      const err = error as Error;
       this.logger.error(
-        `Failed to emit notification ${notification?.id || 'unknown'}: ${error.message}`,
-        error.stack,
+        `Failed to emit notification ${notification?.id || 'unknown'}: ${err.message}`,
+        err.stack,
       );
     }
   }
@@ -268,7 +280,8 @@ export class NotificationGateway
         return;
       }
 
-      client.join(room);
+      // Fixed: Add void to avoid floating promise error
+      void client.join(room);
       this.logger.log(`Client ${client.id} joined room: ${room}`);
 
       const joinNotification: INotification = {
@@ -288,10 +301,8 @@ export class NotificationGateway
         );
       }
     } catch (error) {
-      this.logger.error(
-        `Error in handleJoinRoom: ${error.message}`,
-        error.stack,
-      );
+      const err = error as Error;
+      this.logger.error(`Error in handleJoinRoom: ${err.message}`, err.stack);
       this.emitErrorToClient(client, 'Failed to join room');
     }
   }
@@ -321,9 +332,10 @@ export class NotificationGateway
         );
       }
     } catch (error) {
+      const err = error as Error;
       this.logger.error(
-        `Failed to emit error to client: ${error.message}`,
-        error.stack,
+        `Failed to emit error to client: ${err.message}`,
+        err.stack,
       );
     }
   }
@@ -336,7 +348,8 @@ export class NotificationGateway
         return;
       }
 
-      client.leave(room);
+      // Fixed: Add void to avoid floating promise error
+      void client.leave(room);
       this.logger.log(`Client ${client.id} left room: ${room}`);
 
       const leaveNotification: INotification = {
@@ -356,10 +369,8 @@ export class NotificationGateway
         );
       }
     } catch (error) {
-      this.logger.error(
-        `Error in handleLeaveRoom: ${error.message}`,
-        error.stack,
-      );
+      const err = error as Error;
+      this.logger.error(`Error in handleLeaveRoom: ${err.message}`, err.stack);
     }
   }
 }

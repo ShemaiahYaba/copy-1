@@ -4,17 +4,17 @@ A production-ready, real-time notification system for NestJS applications using 
 
 ## 📋 Table of Contents
 
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Usage Examples](#usage-examples)
-- [API Documentation](#api-documentation)
-- [WebSocket Events](#websocket-events)
-- [Testing](#testing)
-- [Performance](#performance)
-- [Security](#security)
-- [Troubleshooting](#troubleshooting)
+- [✨ Features](#-features)
+- [📦 Installation](#-installation)
+- [🚀 Quick Start](#-quick-start)
+- [⚙️ Configuration](#️-configuration)
+- [💡 Usage Examples](#-usage-examples)
+- [📚 API Documentation](#-api-documentation)
+- [🔌 WebSocket Events](#-websocket-events)
+- [🧪 Testing](#-testing)
+- [⚡ Performance](#-performance)
+- [🔒 Security](#-security)
+- [🛠️ Troubleshooting](#️-troubleshooting)
 
 ---
 
@@ -489,7 +489,7 @@ Send a notification to all connected clients.
 - `dto.message`: string
 - `dto.context?`: Record<string, any>
 
-**Returns:** Promise<INotification>
+**Returns:** `Promise<INotification>`
 
 **Example:**
 
@@ -512,7 +512,7 @@ Send notification to specific room/channel.
 - `room`: string - Target room name
 - `dto`: CreateNotificationDto
 
-**Returns:** Promise<INotification>
+**Returns:** `Promise<INotification>`
 
 **Example:**
 
@@ -536,7 +536,7 @@ Get notification history (requires `persist: true`).
 - `filters.endDate?`: Date
 - `filters.limit?`: number
 
-**Returns:** Promise<INotification[]>
+**Returns:** `Promise<INotification[]>`
 
 **Example:**
 
@@ -751,6 +751,7 @@ describe('My Feature', () => {
    ```
 
 4. **Batch Notifications**
+
    ```typescript
    // Instead of multiple individual notifications
    await service.push({
@@ -1007,7 +1008,7 @@ For issues, questions, or contributions:
 
 - **Issues:** [GitHub Issues](https://github.com/your-repo/issues)
 - **Documentation:** [Full Docs](https://docs.your-domain.com)
-- **Email:** support@your-domain.com
+- **Email:** `support@your-domain.com`
 
 ---
 

@@ -1,9 +1,10 @@
 // ----------------------------------------------------------------------------
-// 8. ERROR SERVICE
+// ERROR SERVICE - UPDATED WITH PROPER SENTRY INTEGRATION
 // src/modules/shared/error/error.service.ts
 // ----------------------------------------------------------------------------
 
 import { Injectable, Inject, Logger, HttpException } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { ErrorConfigDto } from './dto/error-config.dto';
 import { ErrorResponseDto } from './dto/error-response.dto';
 import { ErrorCode } from './constants/error-codes.constant';
@@ -11,7 +12,6 @@ import { ErrorNotificationStrategy } from './dto/error-config.dto';
 import { ErrorSeverity } from './interfaces/error.interface';
 import { AppError } from './classes/app-error.class';
 import { ERROR_CODES } from './constants/error-codes.constant';
-import * as Sentry from '@sentry/node';
 
 @Injectable()
 export class ErrorService {
@@ -108,6 +108,93 @@ export class ErrorService {
     return new AppError(code, message, context);
   }
 
+  /**
+   * Report error to Sentry with proper context and severity mapping
+   */
+  async reportError(error: any, context?: Record<string, any>): Promise<void> {
+    if (!this.config.enableSentry) {
+      return;
+    }
+
+    try {
+      // Sanitize context before sending to Sentry
+      const sanitizedContext = this.sanitizeContext(context);
+
+      // Set Sentry scope with additional context
+      Sentry.withScope((scope) => {
+        // Add custom context
+        if (sanitizedContext && Object.keys(sanitizedContext).length > 0) {
+          scope.setContext('error_context', sanitizedContext);
+        }
+
+        // Add error details for AppError
+        if (error instanceof AppError) {
+          scope.setLevel(this.getSentryLevel(error));
+          scope.setTag('error_code', error.code);
+          scope.setTag('is_operational', error.isOperational.toString());
+          scope.setTag('severity', error.severity);
+
+          // Add error context
+          if (error.context) {
+            scope.setContext(
+              'app_error_context',
+              this.sanitizeContext(error.context),
+            );
+          }
+        }
+
+        // Add request context if available
+        if (context?.url) {
+          scope.setTag('request_path', context.url);
+        }
+        if (context?.method) {
+          scope.setTag('request_method', context.method);
+        }
+        if (context?.correlationId) {
+          scope.setTag('correlation_id', context.correlationId);
+        }
+
+        // Capture the exception
+        Sentry.captureException(error);
+      });
+
+      this.logger.debug(
+        `Error reported to Sentry: ${error.message || 'Unknown error'}`,
+      );
+    } catch (reportError) {
+      // Fail silently in production, log in development
+      this.logger.error('Failed to report error to Sentry', reportError);
+    }
+  }
+
+  /**
+   * Report a custom message to Sentry
+   */
+  reportMessage(
+    message: string,
+    level: Sentry.SeverityLevel = 'info',
+    context?: Record<string, any>,
+  ): void {
+    if (!this.config.enableSentry) {
+      return;
+    }
+
+    try {
+      Sentry.withScope((scope) => {
+        scope.setLevel(level);
+
+        if (context) {
+          const sanitized = this.sanitizeContext(context);
+          scope.setContext('message_context', sanitized);
+        }
+
+        Sentry.captureMessage(message);
+      });
+    } catch (error) {
+      this.logger.error('Failed to report message to Sentry', error);
+    }
+  }
+
   private sanitizeContext(context?: Record<string, any>): Record<string, any> {
     if (!context) return {};
 
@@ -135,22 +222,6 @@ export class ErrorService {
         return 'error';
       default:
         return 'log';
-    }
-  }
-  async reportError(error: any, context?: Record<string, any>): Promise<void> {
-    if (!this.config.enableSentry) return;
-
-    try {
-      if (process.env.SENTRY_DSN) {
-        Sentry.captureException(error, {
-          extra: this.sanitizeContext(context),
-          level: this.getSentryLevel(error),
-        });
-      } else {
-        this.logger.debug('Sentry DSN not configured');
-      }
-    } catch (reportError) {
-      this.logger.error('Failed to report to Sentry', reportError);
     }
   }
 

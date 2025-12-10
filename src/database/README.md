@@ -45,6 +45,7 @@ This module provides database connectivity and ORM functionality using Drizzle O
    ```
 
 4. **Introspect the database**:
+
    ```bash
    pnpm drizzle-kit introspect
    ```
@@ -53,7 +54,7 @@ This module provides database connectivity and ORM functionality using Drizzle O
 
 Ensure these environment variables are set in your `.env` file:
 
-```
+```env
 DATABASE_URL=postgres://user:password@localhost:5432/your_database
 ```
 

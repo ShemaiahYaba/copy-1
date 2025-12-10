@@ -9,15 +9,15 @@ The system supports project creation, team management, skill matching, progress 
 
 ## Table of Contents
 
-1. [Tech Stack](#tech-stack)
-2. [Architecture](#architecture)
-3. [Roles & Permissions](#roles--permissions)
-4. [Database Models](#database-models)
-5. [API Endpoints](#api-endpoints)
-6. [Authentication & Authorization](#authentication--authorization)
-7. [Development Setup](#development-setup)
-8. [Testing](#testing)
-9. [Future Enhancements](#future-enhancements)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Roles & Permissions](#roles--permissions)
+- [Database Models](#database-models)
+- [API Endpoints](#api-endpoints-sample-overview)
+- [Authentication & Authorization](#authentication--authorization)
+- [Development Setup](#development-setup)
+- [Testing](#testing)
+- [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -89,20 +89,20 @@ cd backend
 pnpm install
 ```
 
-3. **Configure environment variables**
+2. **Configure environment variables**
 
 ```env
 DATABASE_URL=postgres://user:password@localhost:5432/dbname
 JWT_SECRET=supersecret
 ```
 
-4. **Run migrations**
+3. **Run migrations**
 
 ```bash
 pnpm drizzle-kit migrate
 ```
 
-5. **Start development server**
+4. **Start development server**
 
 ```bash
 pnpm run start:dev

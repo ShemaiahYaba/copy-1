@@ -68,7 +68,7 @@ export function ApiGetAll(
       description: 'Internal server error',
       type: ErrorResponse,
     }),
-    ...(auth ? [ApiBearerAuth()] : []),
+    ...(auth ? [ApiBearerAuth('JWT')] : []), // ← FIXED
   );
 }
 
@@ -109,7 +109,7 @@ export function ApiGetOne(
       description: 'Internal server error',
       type: ErrorResponse,
     }),
-    ...(auth ? [ApiBearerAuth()] : []),
+    ...(auth ? [ApiBearerAuth('JWT')] : []), // ← FIXED
   );
 }
 
@@ -151,7 +151,7 @@ export function ApiCreate(
       description: 'Internal server error',
       type: ErrorResponse,
     }),
-    ...(auth ? [ApiBearerAuth()] : []),
+    ...(auth ? [ApiBearerAuth('JWT')] : []), // ← FIXED
   );
 }
 
@@ -203,7 +203,7 @@ export function ApiUpdate(
       description: 'Internal server error',
       type: ErrorResponse,
     }),
-    ...(auth ? [ApiBearerAuth()] : []),
+    ...(auth ? [ApiBearerAuth('JWT')] : []), // ← FIXED
   );
 }
 
@@ -238,7 +238,7 @@ export function ApiDelete(resource: string, options: BaseApiOptions = {}) {
       description: 'Internal server error',
       type: ErrorResponse,
     }),
-    ...(auth ? [ApiBearerAuth()] : []),
+    ...(auth ? [ApiBearerAuth('JWT')] : []), // ← FIXED
   );
 }
 
@@ -308,7 +308,7 @@ export function ApiGetPaginated(
       description: 'Internal server error',
       type: ErrorResponse,
     }),
-    ...(auth ? [ApiBearerAuth()] : []),
+    ...(auth ? [ApiBearerAuth('JWT')] : []), // ← FIXED
   );
 }
 
@@ -349,7 +349,7 @@ export function ApiSearch(
       description: 'Internal server error',
       type: ErrorResponse,
     }),
-    ...(auth ? [ApiBearerAuth()] : []),
+    ...(auth ? [ApiBearerAuth('JWT')] : []), // ← FIXED
   );
 }
 
@@ -379,14 +379,6 @@ interface CustomOperationOptions extends BaseApiOptions {
 
 /**
  * Custom operation - Use for any non-standard endpoint
- * @example
- * @ApiCustom({
- *   summary: 'Activate user account',
- *   description: 'Activates a user account by token',
- *   successStatus: 200,
- *   responseType: UserDto,
- *   params: [{ name: 'token', description: 'Activation token' }],
- * })
  */
 export function ApiCustom(options: CustomOperationOptions) {
   const {
@@ -451,7 +443,7 @@ export function ApiCustom(options: CustomOperationOptions) {
 
   // Add auth
   if (auth) {
-    decorators.push(ApiBearerAuth());
+    decorators.push(ApiBearerAuth('JWT')); // ← FIXED
   }
 
   return applyDecorators(...decorators);
@@ -485,6 +477,7 @@ export function ApiLogin(loginDto: Type<any>, responseType: Type<any>) {
       description: 'Internal server error',
       type: ErrorResponse,
     }),
+    // ← NO ApiBearerAuth for login endpoints
   );
 }
 
@@ -515,5 +508,6 @@ export function ApiRegister(registerDto: Type<any>, responseType: Type<any>) {
       description: 'Internal server error',
       type: ErrorResponse,
     }),
+    // ← NO ApiBearerAuth for registration endpoints
   );
 }

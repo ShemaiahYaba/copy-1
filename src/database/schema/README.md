@@ -1,4 +1,4 @@
-## Import/Export Models This Way
+# Import/Export Models This Way
 
 The current setup in `schema/index.ts` is a common pattern used with Drizzle ORM to:
 

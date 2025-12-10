@@ -1,16 +1,10 @@
 // src/modules/shared/notification/__tests__/notification.gateway.spec.ts
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotificationGateway } from '../../shared/notification/notification.gateway';
-import { NotificationService } from '../../shared/notification/notification.service';
-import {
-  NotificationConfigDto,
-  NotificationAdapter,
-} from '../../shared/notification/dto';
-import {
-  NotificationType,
-  INotification,
-} from '../../shared/notification/interfaces';
+import { NotificationGateway } from '../notification.gateway';
+import { NotificationService } from '../notification.service';
+import { NotificationConfigDto, NotificationAdapter } from '../dto';
+import { NotificationType, INotification } from '../interfaces';
 import { Server, Socket } from 'socket.io';
 
 // Increase global timeout for all tests
@@ -283,8 +277,8 @@ describe('NotificationGateway', () => {
         timestampValue instanceof Date
           ? timestampValue
           : timestampValue
-          ? new Date(timestampValue)
-          : undefined;
+            ? new Date(timestampValue)
+            : undefined;
       expect(timestampAsDate).toBeDefined();
       expect(timestampAsDate).toBeInstanceOf(Date);
       expect(isNaN((timestampAsDate as Date).getTime())).toBe(false);
