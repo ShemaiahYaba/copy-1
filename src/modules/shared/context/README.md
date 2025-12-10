@@ -4,16 +4,13 @@ A production-ready request-scoped context management system for NestJS applicati
 
 ## 📋 Table of Contents
 
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Usage Examples](#usage-examples)
-- [API Documentation](#api-documentation)
-- [Storage Adapters](#storage-adapters)
-- [Testing](#testing)
-- [Best Practices](#best-practices)
-- [Troubleshooting](#troubleshooting)
+- [✨ Features](#-features)
+- [📦 Installation](#-installation)
+- [🚀 Quick Start](#-quick-start)
+- [⚙️ Configuration](#️-configuration)
+- [💡 Usage Examples](#-usage-examples)
+- [📚 API Documentation](#-api-documentation)
+-
 
 ---
 
@@ -875,7 +872,7 @@ For issues, questions, or contributions:
 
 - **Issues:** [GitHub Issues](https://github.com/your-repo/issues)
 - **Documentation:** This README
-- **Email:** support@your-domain.com
+- **Email:** `support@your-domain.com`
 
 ---
 

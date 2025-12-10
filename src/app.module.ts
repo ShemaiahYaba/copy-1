@@ -12,6 +12,9 @@ import { ErrorModule } from './modules/shared/error/error.module';
 import { NotificationModule } from './modules/shared/notification/notification.module';
 import { ErrorNotificationStrategy } from './modules/shared/error/dto/error-config.dto';
 import { NotificationAdapter } from '@modules/shared/notification/dto';
+import { AuthModule } from '@modules/core/auth/auth.module';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 @Module({
   imports: [
@@ -36,9 +39,10 @@ import { NotificationAdapter } from '@modules/shared/notification/dto';
         process.env.NODE_ENV === 'production' ||
         process.env.SENTRY_ENABLED === 'true',
     }),
+    DatabaseModule,
+    AuthModule,
 
     // 4. Your other modules
-    DatabaseModule,
   ],
   controllers: [AppController],
   providers: [AppService],

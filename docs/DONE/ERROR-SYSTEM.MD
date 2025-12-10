@@ -16,7 +16,7 @@ Provide a unified error handling system that catches, formats, and standardizes 
 
 ## 🏗️ File Structure
 
-```
+```text
 src/error/
 ├── dto/
 │   ├── error-response.dto.ts           # Standardized error response shape
@@ -483,7 +483,7 @@ export class ErrorResponseDto implements IErrorResponse {
 
 **File:** `error.service.ts`
 
-#### **Responsibilities:**
+#### **AppErrorFilter Responsibilities:**
 
 1. Transform errors into standardized format
 2. Determine notification strategy
@@ -569,7 +569,7 @@ export class ErrorService {
 
 **File:** `filters/app-error.filter.ts`
 
-#### **Responsibilities:**
+#### **AppErrorFilter Responsibilities:**
 
 1. Catch all unhandled errors globally
 2. Transform errors using ErrorService
@@ -1106,238 +1106,15 @@ Module is complete when:
 - [ ] Create example usage in controllers
 - [ ] Test error → notification flow
 
-### **Phase 5: Polish & Production Ready (Day 5)**
-
 - [ ] Add external error tracking (Sentry integration)
 - [ ] Add data sanitization
-- [ ] Performance testing (error handling overhead)
-- [ ] Security audit (sensitive data exposure)
-- [ ] Documentation review
+- [ ] Performance Testing (Error Handling Overhead)
+- [ ] Security Audit (Sensitive Data Exposure)
+- [ ] Documentation Review
 
 ---
 
-## 🎯 Success Metrics
-
-- **Test Coverage:** >85%
-- **Error Processing Time:** <10ms per error
-- **Zero Leaked Sensitive Data:** No passwords, tokens, or PII in logs/responses
-- **Notification Reliability:** >99.9% of operational errors trigger notifications
-- **Stack Trace Control:** Never exposed in production
-
----
-
-## 📚 Documentation Requirements
-
-**README.md must include:**
-
-1. **Quick Start Guide**
-   - Installation
-   - Basic configuration
-   - First error example
-
-2. **Error Code Reference**
-   - Complete list of error codes
-   - HTTP status mappings
-   - When to use each code
-
-3. **Error Classes Guide**
-   - When to use AppError
-   - When to use ValidationError
-   - When to use BusinessError
-   - How to create custom error classes
-
-4. **Configuration Options**
-   - All config parameters explained
-   - Environment-specific examples
-   - Best practices
-
-5. **Usage Examples**
-   - Common patterns
-   - Integration with services
-   - Custom error handling
-
-6. **Troubleshooting**
-   - Common issues
-   - Debugging tips
-   - FAQ
-
-7. **Security Considerations**
-   - Data sanitization
-   - Stack trace exposure
-   - Error logging best practices
-
----
-
-## 🔒 Security Considerations
-
-### **1. Sensitive Data Sanitization**
-
-**Fields to sanitize in error context:**
-
-- Passwords
-- API keys
-- Tokens (JWT, session, etc.)
-- Credit card numbers
-- Personal identifiable information (PII)
-- Database connection strings
-
-**Implementation:**
-
-```typescript
-private sanitizeContext(context?: Record<string, any>): Record<string, any> {
-  if (!context) return {};
-
-  const sensitiveKeys = [
-    'password', 'token', 'apiKey', 'secret',
-    'creditCard', 'ssn', 'connectionString'
-  ];
-
-  const sanitized = { ...context };
-
-  for (const key of sensitiveKeys) {
-    if (key in sanitized) {
-      sanitized[key] = '***REDACTED***';
-    }
-  }
-
-  return sanitized;
-}
-```
-
-### **2. Stack Trace Exposure**
-
-**Rules:**
-
-- ❌ Never include stack traces in production responses
-- ✅ Log stack traces server-side for debugging
-- ✅ Include stack traces in development mode only
-- ✅ Use config flag to control: `includeStackTrace`
-
-### **3. Error Message Safety**
-
-**Bad (exposes internals):**
-
-```typescript
-throw new AppError(
-  ERROR_CODES.DATABASE_ERROR,
-  `Query failed: SELECT * FROM users WHERE password = '${password}'`,
-);
-```
-
-**Good (generic, safe):**
-
-```typescript
-throw new AppError(
-  ERROR_CODES.DATABASE_ERROR,
-  'Database operation failed',
-  { operation: 'user_query' }, // No sensitive details
-);
-```
-
-### **4. Rate Limiting Error Responses**
-
-Consider rate limiting error responses to prevent:
-
-- Brute force attacks
-- Information disclosure through error messages
-- Resource exhaustion
-
-**Implementation idea:**
-
-```typescript
-// In filter, track error counts per IP/user
-if (this.errorRateLimiter.isExceeded(clientIp)) {
-  return response.status(429).json({
-    status: 'error',
-    code: ERROR_CODES.RATE_LIMIT_EXCEEDED,
-    message: 'Too many errors, please try again later',
-  });
-}
-```
-
----
-
-## 🔄 Integration with Other Modules
-
-### **With NotificationModule:**
-
-```typescript
-// Automatic notification on operational errors
-if (error.isOperational && this.shouldNotify(error)) {
-  await this.notificationService.push({
-    type: NotificationType.ERROR,
-    message: error.message,
-    context: this.sanitizeContext(error.context),
-  });
-}
-```
-
-### **With ContextModule (future):**
-
-```typescript
-// Include context metadata in errors
-const contextMeta = this.contextService.getMeta();
-
-const errorResponse = ErrorResponseDto.fromAppError(error, request);
-errorResponse.correlationId = contextMeta.correlationId;
-errorResponse.context = {
-  ...error.context,
-  userId: contextMeta.userId,
-  orgId: contextMeta.orgId,
-};
-```
-
-### **With LoggingModule (future):**
-
-```typescript
-// Structured error logging
-this.logger.error({
-  errorCode: error.code,
-  message: error.message,
-  severity: error.severity,
-  correlationId: contextMeta.correlationId,
-  stack: error.stack,
-});
-```
-
----
-
-## 📊 Error Monitoring & Observability
-
-### **Key Metrics to Track:**
-
-1. **Error Rate**
-   - Errors per minute/hour
-   - Error rate by endpoint
-   - Error rate by error code
-
-2. **Error Distribution**
-   - Most common error codes
-   - Error severity distribution
-   - Operational vs non-operational ratio
-
-3. **Response Times**
-   - Time to catch and process error
-   - Time to send notification
-   - End-to-end error handling time
-
-4. **Notification Success Rate**
-   - Successfully sent notifications
-   - Failed notifications
-   - Notification delivery time
-
-### **Recommended Tools:**
-
-- **Application Monitoring:** Sentry, Datadog, New Relic
-- **Log Aggregation:** ELK Stack, Splunk, CloudWatch
-- **Metrics:** Prometheus + Grafana
-- **Alerting:** PagerDuty for critical errors
-
----
-
-## 🎨 Frontend Error Handling Guide
-
-### **Consuming Error Responses:**
+### Consuming Error Responses
 
 ```typescript
 // Frontend API client
@@ -1348,7 +1125,7 @@ async function apiCall(endpoint: string, options: RequestInit) {
     if (!response.ok) {
       const error = await response.json();
 
-      // Error format is standardized
+      // Error Format is Standardized
       console.error('API Error:', {
         code: error.code,
         message: error.message,
@@ -1525,13 +1302,13 @@ interface ErrorChain {
 
 ### **Common Issues:**
 
-**1. Errors not being caught by filter**
+#### 1. Errors not being caught by filter
 
 - ✓ Check filter is registered globally
 - ✓ Verify `APP_FILTER` provider is set
 - ✓ Ensure error is thrown (not returned)
 
-**2. Notifications not sent for errors**
+#### 2. Notifications not sent for errors
 
 - ✓ Check `notifyFrontend: true` in config
 - ✓ Verify NotificationModule is imported

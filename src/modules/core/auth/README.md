@@ -4,18 +4,15 @@ Enterprise-grade, type-safe authentication system for NestJS applications using 
 
 ## 📋 Table of Contents
 
-- [Features](#features)
-- [Architecture](#architecture)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Type Safety](#type-safety)
-- [API Endpoints](#api-endpoints)
-- [Guards & Decorators](#guards--decorators)
-- [Usage Examples](#usage-examples)
-- [Integration](#integration)
-- [Security](#security)
-- [Testing](#testing)
-- [Troubleshooting](#troubleshooting)
+- [✨ Features](#-features)
+- [🏗️ Architecture](#️-architecture)
+- [📦 Installation](#-installation)
+- [🚀 Quick Start](#-quick-start)
+- [🔒 Type Safety](#-type-safety)
+- [🌐 API Endpoints](#-api-endpoints)
+- [🛡️ Guards & Decorators](#️-guards--decorators)
+- [💡 Usage Examples](#-usage-examples)
+-
 
 ---
 
@@ -50,22 +47,16 @@ Enterprise-grade, type-safe authentication system for NestJS applications using 
 
 ### Authentication Flow
 
-```
-┌─────────────┐         ┌─────────────┐         ┌─────────────┐
-│   Frontend  │ ──────> │   NestJS    │ ──────> │  Supabase   │
-│             │  Token  │   Backend   │   JWT   │    Auth     │
-└─────────────┘         └─────────────┘         └─────────────┘
-                              │
-                              ▼
-                        ┌─────────────┐
-                        │  PostgreSQL │
-                        │  (Profiles) │
-                        └─────────────┘
+```mermaid
+graph LR
+    A[Frontend] -->|Token| B[NestJS Backend]
+    B -->|JWT| C[Supabase Auth]
+    B --> D[(PostgreSQL Profiles)]
 ```
 
 ### Key Components
 
-```
+```bash
 auth/
 ├── decorators/           # @CurrentUser(), @Roles(), @Public()
 ├── guards/              # JwtAuthGuard, RolesGuard
