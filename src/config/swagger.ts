@@ -285,7 +285,7 @@ Click the 🔓 **Authorize** button above and enter: \`Bearer YOUR_ACCESS_TOKEN\
       'JWT-auth',
     )
     .addServer('http://localhost:3000', 'Local Development')
-    .addServer('https://api.gradlinq.com', 'Production') // Note: Removed trailing spaces
+    .addServer('https://gradlinq.fly.dev/', 'Production') // Note: Removed trailing spaces
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {
