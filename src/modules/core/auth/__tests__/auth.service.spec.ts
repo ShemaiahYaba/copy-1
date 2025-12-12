@@ -25,14 +25,14 @@ describe('AuthService (OTP Flow)', () => {
   ): User => ({
     id,
     email,
-    email_confirmed_at: confirmed ? new Date().toISOString() : null, // ✅ NULL until OTP verified
+    email_confirmed_at: confirmed ? new Date().toISOString() : undefined, // ✅ NULL until OTP verified
     user_metadata: { name: 'Test User' },
     app_metadata: {},
     aud: 'authenticated',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    confirmed_at: confirmed ? new Date().toISOString() : null,
-    last_sign_in_at: null,
+    confirmed_at: confirmed ? new Date().toISOString() : undefined,
+    last_sign_in_at: undefined,
     phone: '',
     role: 'authenticated',
   });
