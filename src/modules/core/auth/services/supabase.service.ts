@@ -6,6 +6,7 @@ import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 export class SupabaseService implements OnModuleInit {
   private readonly logger = new Logger(SupabaseService.name);
   private supabase!: SupabaseClient<any, any>;
+
   onModuleInit() {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -16,7 +17,6 @@ export class SupabaseService implements OnModuleInit {
       );
     }
 
-    // Create Supabase client with service role (admin privileges)
     this.supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
@@ -27,20 +27,17 @@ export class SupabaseService implements OnModuleInit {
     this.logger.log('Supabase service initialized');
   }
 
-  /**
-   * Get Supabase client (for direct access if needed)
-   */
   getClient(): SupabaseClient<any, any> {
     return this.supabase;
   }
 
   // ==========================================================================
-  // USER MANAGEMENT (Admin Operations)
+  // USER MANAGEMENT WITH OTP
   // ==========================================================================
 
   /**
-   * Create new user in Supabase Auth
-   * Uses admin.createUser to bypass email confirmation for MVP
+   * Create new user - OTP will be sent automatically by Supabase
+   * Note: User account is created but not confirmed until OTP is verified
    */
   async createUser(
     email: string,
@@ -48,11 +45,12 @@ export class SupabaseService implements OnModuleInit {
     metadata?: { name?: string },
   ): Promise<User> {
     try {
+      // Create user WITHOUT auto-confirmation (email_confirm: false)
       const { data, error } = await this.supabase.auth.admin.createUser({
         email,
         password,
         user_metadata: metadata || {},
-        email_confirm: true,
+        email_confirm: false, // ✅ Changed: Don't auto-confirm, require OTP
       });
 
       if (error) {
@@ -60,7 +58,7 @@ export class SupabaseService implements OnModuleInit {
         throw error;
       }
 
-      this.logger.log(`User created: ${email}`);
+      this.logger.log(`User created (pending OTP verification): ${email}`);
       return data.user;
     } catch (error) {
       this.logger.error('Error creating user:', error);
@@ -68,32 +66,129 @@ export class SupabaseService implements OnModuleInit {
     }
   }
 
+  // ==========================================================================
+  // OTP METHODS
+  // ==========================================================================
+
   /**
-   * Delete user from Supabase Auth (admin operation)
+   * Send OTP to user's email
+   * @param email - User's email address
+   * @param type - Type of OTP (e.g., 'signup', 'login', 'recovery')
    */
-  async deleteUser(userId: string): Promise<void> {
+  async sendOTP(
+    email: string,
+    type: 'signup' | 'login' | 'recovery' = 'signup',
+  ): Promise<void> {
     try {
-      const { error } = await this.supabase.auth.admin.deleteUser(userId);
+      const { error } = await this.supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${process.env.FRONTEND_URL}/auth/callback`,
+        },
+      });
 
       if (error) {
-        this.logger.error('Failed to delete user:', error);
+        this.logger.error('Failed to send OTP:', error);
         throw error;
       }
 
-      this.logger.log(`User deleted: ${userId}`);
+      this.logger.log(`OTP sent to ${email} for ${type}`);
     } catch (error) {
-      this.logger.error('Error deleting user:', error);
+      this.logger.error('Error sending OTP:', error);
+      throw new Error('Failed to send OTP. Please try again later.');
+    }
+  }
+
+  /**
+   * Verify OTP and create session
+   * Returns user and session if OTP is valid
+   */
+  async verifyOTP(email: string, token: string) {
+    try {
+      const { data, error } = await this.supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'email', // or 'magiclink' depending on your flow
+      });
+
+      if (error) {
+        this.logger.error('OTP verification failed:', error);
+        throw error;
+      }
+
+      if (!data.session || !data.user) {
+        throw new Error('Invalid OTP or session creation failed');
+      }
+
+      this.logger.log(`OTP verified for: ${email}`);
+      return data; // Returns { user, session }
+    } catch (error) {
+      this.logger.error('Error verifying OTP:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Resend OTP (for when user doesn't receive it)
+   */
+  async resendOTP(email: string): Promise<void> {
+    try {
+      const { error } = await this.supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
+
+      if (error) {
+        this.logger.error('Failed to resend OTP:', error);
+        throw error;
+      }
+
+      this.logger.log(`OTP resent to: ${email}`);
+    } catch (error) {
+      this.logger.error('Error resending OTP:', error);
       throw error;
     }
   }
 
   // ==========================================================================
-  // AUTHENTICATION
+  // AUTHENTICATION (UPDATED FOR OTP FLOW)
   // ==========================================================================
 
   /**
-   * Sign in with email and password
-   * Returns session with access token and refresh token
+   * Initiate login by sending OTP
+   * Replaces signInWithPassword for OTP-based auth
+   */
+  async initiateOTPLogin(email: string): Promise<void> {
+    try {
+      const { error } = await this.supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false, // Only allow existing users to login
+        },
+      });
+
+      if (error) {
+        this.logger.error('Failed to initiate OTP login:', error);
+        throw error;
+      }
+
+      this.logger.log(`OTP login initiated for: ${email}`);
+    } catch (error) {
+      this.logger.error('Error initiating OTP login:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Complete login by verifying OTP
+   */
+  async completeOTPLogin(email: string, token: string) {
+    return this.verifyOTP(email, token);
+  }
+
+  /**
+   * LEGACY: Keep password-based signin for backward compatibility
+   * You can remove this if going fully OTP-only
    */
   async signInWithPassword(email: string, password: string) {
     try {
@@ -108,19 +203,15 @@ export class SupabaseService implements OnModuleInit {
       }
 
       this.logger.log(`User signed in: ${email}`);
-      return data; // Returns { user, session }
+      return data;
     } catch (error) {
       this.logger.error('Error signing in:', error);
       throw error;
     }
   }
 
-  /**
-   * Sign out user (invalidate session)
-   */
   async signOut(accessToken: string): Promise<void> {
     try {
-      // Create a temporary client with the user's token
       const userClient = createClient(
         process.env.SUPABASE_URL!,
         process.env.SUPABASE_ANON_KEY!,
@@ -151,9 +242,6 @@ export class SupabaseService implements OnModuleInit {
   // TOKEN VERIFICATION
   // ==========================================================================
 
-  /**
-   * Verify access token and get user
-   */
   async verifyToken(accessToken: string): Promise<User> {
     try {
       const { data, error } = await this.supabase.auth.getUser(accessToken);
@@ -174,9 +262,6 @@ export class SupabaseService implements OnModuleInit {
     }
   }
 
-  /**
-   * Refresh access token using refresh token
-   */
   async refreshSession(refreshToken: string) {
     try {
       const { data, error } = await this.supabase.auth.refreshSession({
@@ -189,7 +274,7 @@ export class SupabaseService implements OnModuleInit {
       }
 
       this.logger.log('Session refreshed');
-      return data; // Returns { user, session }
+      return data;
     } catch (error) {
       this.logger.error('Error refreshing session:', error);
       throw error;
@@ -197,12 +282,9 @@ export class SupabaseService implements OnModuleInit {
   }
 
   // ==========================================================================
-  // USER UPDATES (Admin Operations)
+  // USER UPDATES
   // ==========================================================================
 
-  /**
-   * Update user email (admin operation)
-   */
   async updateUserEmail(userId: string, newEmail: string): Promise<User> {
     try {
       const { data, error } = await this.supabase.auth.admin.updateUserById(
@@ -223,9 +305,6 @@ export class SupabaseService implements OnModuleInit {
     }
   }
 
-  /**
-   * Update user password (admin operation)
-   */
   async updateUserPassword(userId: string, newPassword: string): Promise<User> {
     try {
       const { data, error } = await this.supabase.auth.admin.updateUserById(
@@ -246,9 +325,6 @@ export class SupabaseService implements OnModuleInit {
     }
   }
 
-  /**
-   * Update user metadata
-   */
   async updateUserMetadata(
     userId: string,
     metadata: Record<string, any>,
@@ -273,12 +349,9 @@ export class SupabaseService implements OnModuleInit {
   }
 
   // ==========================================================================
-  // PASSWORD RECOVERY
+  // PASSWORD RECOVERY (Now uses OTP)
   // ==========================================================================
 
-  /**
-   * Send password recovery email
-   */
   async sendPasswordRecoveryEmail(email: string): Promise<void> {
     try {
       const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
@@ -297,30 +370,18 @@ export class SupabaseService implements OnModuleInit {
     }
   }
 
-  // ==========================================================================
-  // EMAIL VERIFICATION
-  // ==========================================================================
-
-  /**
-   * Send email verification link
-   */
-  async sendVerificationEmail(email: string): Promise<void> {
+  async deleteUser(userId: string): Promise<void> {
     try {
-      // Note: This requires the user to be authenticated
-      // For admin operation, we auto-confirm during createUser
-      const { error } = await this.supabase.auth.resend({
-        type: 'signup',
-        email,
-      });
+      const { error } = await this.supabase.auth.admin.deleteUser(userId);
 
       if (error) {
-        this.logger.error('Failed to send verification email:', error);
+        this.logger.error('Failed to delete user:', error);
         throw error;
       }
 
-      this.logger.log(`Verification email sent to: ${email}`);
+      this.logger.log(`User deleted: ${userId}`);
     } catch (error) {
-      this.logger.error('Error sending verification email:', error);
+      this.logger.error('Error deleting user:', error);
       throw error;
     }
   }

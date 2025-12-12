@@ -1,21 +1,16 @@
 // src/modules/core/auth/auth.controller.ts
-import { Controller, Post, Body, HttpCode, Headers } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import {
-  ApiCreate,
-  ApiLogin,
-  ApiCustom,
-} from '@modules/api-docs/api-docs.decorator';
+import { ApiCreate, ApiCustom } from '@modules/api-docs/api-docs.decorator';
 
 import { AuthService } from './auth.service';
-import { Public } from './decorators/public.decorator'; // ✅ IMPORT THIS
+import { Public } from './decorators/public.decorator';
 
 import {
   RegisterClientDto,
   RegisterSupervisorDto,
   RegisterStudentDto,
   RegisterUniversityDto,
-  LoginDto,
   LogoutDto,
   VerifySessionDto,
   RefreshTokenDto,
@@ -23,6 +18,11 @@ import {
   LogoutResponseDto,
   TokenResponseDto,
   VerifySessionResponseDto,
+  VerifyOTPDto,
+  InitiateOTPLoginDto,
+  ResendOTPDto,
+  OTPSentResponseDto,
+  RegistrationPendingResponseDto,
 } from './dto/register.dto';
 
 @ApiTags('auth')
@@ -31,63 +31,145 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   // ==========================================================================
-  // REGISTRATION ENDPOINTS
+  // REGISTRATION ENDPOINTS (OTP FLOW)
   // ==========================================================================
 
   @Post('register/client')
-  @Public() // ✅ ADDED - Bypass JwtAuthGuard
-  @ApiCreate('client', RegisterClientDto, AuthResponseDto, { auth: false })
+  @Public()
+  @ApiCreate('client', RegisterClientDto, RegistrationPendingResponseDto, {
+    auth: false,
+  })
   async registerClient(
     @Body() dto: RegisterClientDto,
-  ): Promise<AuthResponseDto> {
+  ): Promise<RegistrationPendingResponseDto> {
     return this.authService.registerClient(dto);
   }
 
   @Post('register/supervisor')
-  @Public() // ✅ ADDED
-  @ApiCreate('supervisor', RegisterSupervisorDto, AuthResponseDto, {
-    auth: false,
-  })
+  @Public()
+  @ApiCreate(
+    'supervisor',
+    RegisterSupervisorDto,
+    RegistrationPendingResponseDto,
+    {
+      auth: false,
+    },
+  )
   async registerSupervisor(
     @Body() dto: RegisterSupervisorDto,
-  ): Promise<AuthResponseDto> {
+  ): Promise<RegistrationPendingResponseDto> {
     return this.authService.registerSupervisor(dto);
   }
 
   @Post('register/student')
-  @Public() // ✅ ADDED
-  @ApiCreate('student', RegisterStudentDto, AuthResponseDto, { auth: false })
+  @Public()
+  @ApiCreate('student', RegisterStudentDto, RegistrationPendingResponseDto, {
+    auth: false,
+  })
   async registerStudent(
     @Body() dto: RegisterStudentDto,
-  ): Promise<AuthResponseDto> {
+  ): Promise<RegistrationPendingResponseDto> {
     return this.authService.registerStudent(dto);
   }
 
   @Post('register/university')
-  @Public() // ✅ ADDED
-  @ApiCreate('university', RegisterUniversityDto, AuthResponseDto, {
-    auth: false,
-  })
+  @Public()
+  @ApiCreate(
+    'university',
+    RegisterUniversityDto,
+    RegistrationPendingResponseDto,
+    {
+      auth: false,
+    },
+  )
   async registerUniversity(
     @Body() dto: RegisterUniversityDto,
-  ): Promise<AuthResponseDto> {
+  ): Promise<RegistrationPendingResponseDto> {
     return this.authService.registerUniversity(dto);
   }
 
   // ==========================================================================
-  // AUTHENTICATION ENDPOINTS
+  // OTP VERIFICATION ENDPOINT
   // ==========================================================================
 
-  @Post('login')
-  @Public() // ✅ ADDED
+  @Post('verify-otp')
+  @Public()
   @HttpCode(200)
-  @ApiLogin(LoginDto, AuthResponseDto)
-  async login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(dto);
+  @ApiCustom({
+    summary: 'Verify OTP after registration',
+    description: 'Complete registration by verifying the OTP sent to email',
+    successStatus: 200,
+    body: VerifyOTPDto,
+    responseType: AuthResponseDto,
+    auth: false,
+  })
+  async verifyRegistrationOTP(
+    @Body() dto: VerifyOTPDto,
+  ): Promise<AuthResponseDto> {
+    return this.authService.verifyRegistrationOTP(dto);
   }
 
+  // ==========================================================================
+  // LOGIN ENDPOINTS (OTP FLOW)
+  // ==========================================================================
+
+  @Post('login/initiate')
+  @Public()
+  @HttpCode(200)
+  @ApiCustom({
+    summary: 'Initiate OTP login',
+    description: 'Send OTP to user email for login',
+    successStatus: 200,
+    body: InitiateOTPLoginDto,
+    responseType: OTPSentResponseDto,
+    auth: false,
+  })
+  async initiateOTPLogin(
+    @Body() dto: InitiateOTPLoginDto,
+  ): Promise<OTPSentResponseDto> {
+    return this.authService.initiateOTPLogin(dto);
+  }
+
+  @Post('login/verify')
+  @Public()
+  @HttpCode(200)
+  @ApiCustom({
+    summary: 'Complete OTP login',
+    description: 'Verify OTP and complete login',
+    successStatus: 200,
+    body: VerifyOTPDto,
+    responseType: AuthResponseDto,
+    auth: false,
+  })
+  async verifyLoginOTP(@Body() dto: VerifyOTPDto): Promise<AuthResponseDto> {
+    return this.authService.verifyLoginOTP(dto);
+  }
+
+  // ==========================================================================
+  // OTP MANAGEMENT
+  // ==========================================================================
+
+  @Post('resend-otp')
+  @Public()
+  @HttpCode(200)
+  @ApiCustom({
+    summary: 'Resend OTP',
+    description: 'Resend OTP code to user email',
+    successStatus: 200,
+    body: ResendOTPDto,
+    responseType: OTPSentResponseDto,
+    auth: false,
+  })
+  async resendOTP(@Body() dto: ResendOTPDto): Promise<OTPSentResponseDto> {
+    return this.authService.resendOTP(dto);
+  }
+
+  // ==========================================================================
+  // OTHER AUTH ENDPOINTS (Unchanged)
+  // ==========================================================================
+
   @Post('logout')
-  @Public() // ✅ ADDED (logout doesn't need auth in most systems)
+  @Public()
   @HttpCode(200)
   @ApiCustom({
     summary: 'Logout user',
@@ -97,20 +179,13 @@ export class AuthController {
     responseType: LogoutResponseDto,
     auth: false,
   })
-  async logout(
-    @Body() dto: LogoutDto,
-    @Headers('x-user-id') userId?: string,
-  ): Promise<LogoutResponseDto> {
-    await this.authService.logout(dto.accessToken, userId);
+  async logout(@Body() dto: LogoutDto): Promise<LogoutResponseDto> {
+    await this.authService.logout(dto.accessToken);
     return { message: 'Logged out successfully' };
   }
 
-  // ==========================================================================
-  // SESSION & TOKEN MANAGEMENT
-  // ==========================================================================
-
   @Post('verify-session')
-  @Public() // ✅ ADDED (verification endpoint should be public)
+  @Public()
   @HttpCode(200)
   @ApiCustom({
     summary: 'Verify session',
@@ -127,7 +202,7 @@ export class AuthController {
   }
 
   @Post('refresh')
-  @Public() // ✅ ADDED (refresh endpoint should be public)
+  @Public()
   @HttpCode(200)
   @ApiCustom({
     summary: 'Refresh access token',

@@ -16,6 +16,34 @@ import { ErrorCode, ERROR_CODES } from '../../constants/error-codes.constant';
 import { NotificationService } from '../../../notification/notification.service';
 import { NotificationType } from '../../../notification/interfaces/notification.interface';
 
+// Extended Request type with correlationId
+interface RequestWithCorrelationId extends Request {
+  correlationId?: string;
+}
+
+// Type for validation error response
+interface ValidationErrorResponse {
+  status: string;
+  code: ErrorCode;
+  message: string | string[];
+  timestamp: string;
+  path: string;
+  method: string;
+  correlationId?: string;
+}
+
+// Type for error response from ErrorService.processError
+interface ProcessedErrorResponse {
+  status: string;
+  code: ErrorCode;
+  message: string | string[];
+  timestamp: string | Date; // Accept both string and Date types
+  path?: string;
+  method?: string;
+  context?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 @common.Catch()
 export class AppErrorFilter implements common.ExceptionFilter {
   private readonly logger = new common.Logger(AppErrorFilter.name);
@@ -70,8 +98,20 @@ export class AppErrorFilter implements common.ExceptionFilter {
       });
     }
 
+    // Ensure timestamp is a string for the response
+    const responseToSend = {
+      ...errorResponse,
+      timestamp:
+        errorResponse.timestamp instanceof Date
+          ? errorResponse.timestamp.toISOString()
+          : errorResponse.timestamp,
+    };
+
     // Add correlationId if present
-    const response = this.enrichResponse(errorResponse, req);
+    const response = this.enrichResponse(
+      responseToSend as ProcessedErrorResponse,
+      req,
+    );
 
     // Send final response
     return res.status(statusCode).json(response);
@@ -85,14 +125,22 @@ export class AppErrorFilter implements common.ExceptionFilter {
     req: Request,
     res: Response,
   ) {
-    const exceptionResponse = exception.getResponse() as any;
+    const exceptionResponse = exception.getResponse() as
+      | { message?: string | string[] }
+      | string;
 
     // Extract validation messages
-    const messages = Array.isArray(exceptionResponse.message)
-      ? exceptionResponse.message
-      : [exceptionResponse.message || 'Validation failed'];
+    const messages = (() => {
+      if (typeof exceptionResponse === 'string') {
+        return [exceptionResponse];
+      }
+      if (Array.isArray(exceptionResponse.message)) {
+        return exceptionResponse.message;
+      }
+      return [exceptionResponse.message || 'Validation failed'];
+    })();
 
-    const response: any = {
+    const response: ValidationErrorResponse = {
       status: 'error',
       code: ERROR_CODES.VALIDATION_ERROR,
       message: messages,
@@ -102,9 +150,9 @@ export class AppErrorFilter implements common.ExceptionFilter {
     };
 
     // Add correlationId if present
-    const correlationId = (req as any).correlationId;
-    if (correlationId) {
-      response.correlationId = correlationId;
+    const typedReq = req as RequestWithCorrelationId;
+    if (typedReq.correlationId) {
+      response.correlationId = typedReq.correlationId;
     }
 
     return res.status(400).json(response);
@@ -113,13 +161,16 @@ export class AppErrorFilter implements common.ExceptionFilter {
   // --------------------------------------------------------------------------
   // Helper: Enrich response with correlationId
   // --------------------------------------------------------------------------
-  private enrichResponse(errorResponse: any, req: Request) {
-    const correlationId = (req as any).correlationId;
+  private enrichResponse(
+    errorResponse: ProcessedErrorResponse,
+    req: Request,
+  ): ProcessedErrorResponse & { correlationId?: string } {
+    const typedReq = req as RequestWithCorrelationId;
 
-    if (correlationId) {
+    if (typedReq.correlationId) {
       return {
         ...errorResponse,
-        correlationId,
+        correlationId: typedReq.correlationId,
       };
     }
 
@@ -129,7 +180,7 @@ export class AppErrorFilter implements common.ExceptionFilter {
   // --------------------------------------------------------------------------
   // Helper: Safe notification wrapper
   // --------------------------------------------------------------------------
-  private safeNotifyFrontend(errorResponse: any) {
+  private safeNotifyFrontend(errorResponse: ProcessedErrorResponse) {
     const message = Array.isArray(errorResponse.message)
       ? errorResponse.message.join(', ')
       : errorResponse.message;

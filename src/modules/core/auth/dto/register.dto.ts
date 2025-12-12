@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsUUID,
   IsArray,
+  Length,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -396,4 +397,94 @@ export class VerifySessionResponseDto {
     | SupervisorProfileDto
     | StudentProfileDto
     | UniversityProfileDto;
+}
+// ==========================================================================
+// OTP VERIFICATION DTOs
+// ==========================================================================
+
+export class VerifyOTPDto {
+  @ApiProperty({
+    description: 'User email address',
+    example: 'john.doe@company.com',
+  })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({
+    description: '6-digit OTP code sent to email',
+    example: '123456',
+    minLength: 6,
+    maxLength: 6,
+  })
+  @IsString()
+  @Length(6, 6, { message: 'OTP must be exactly 6 digits' })
+  token: string;
+}
+
+export class InitiateOTPLoginDto {
+  @ApiProperty({
+    description: 'User email address to send OTP',
+    example: 'john.doe@company.com',
+  })
+  @IsEmail()
+  email: string;
+}
+
+export class ResendOTPDto {
+  @ApiProperty({
+    description: 'User email address',
+    example: 'john.doe@company.com',
+  })
+  @IsEmail()
+  email: string;
+}
+
+// ==========================================================================
+// RESPONSE DTOs FOR OTP FLOW
+// ==========================================================================
+
+export class OTPSentResponseDto {
+  @ApiProperty({
+    description: 'Success message',
+    example: 'OTP sent successfully to your email',
+  })
+  message: string;
+
+  @ApiProperty({
+    description: 'Email where OTP was sent',
+    example: 'john.doe@company.com',
+  })
+  email: string;
+
+  @ApiProperty({
+    description: 'OTP expiration time in seconds',
+    example: 600,
+  })
+  expiresIn: number;
+}
+
+export class RegistrationPendingResponseDto {
+  @ApiProperty({
+    description: 'Success message',
+    example: 'Account created. Please verify your email with the OTP sent.',
+  })
+  message: string;
+
+  @ApiProperty({
+    description: 'User email',
+    example: 'john.doe@company.com',
+  })
+  email: string;
+
+  @ApiProperty({
+    description: 'User ID (for reference)',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  userId: string;
+
+  @ApiProperty({
+    description: 'Whether OTP was sent',
+    example: true,
+  })
+  otpSent: boolean;
 }

@@ -10,9 +10,7 @@ A production-ready request-scoped context management system for NestJS applicati
 - [⚙️ Configuration](#️-configuration)
 - [💡 Usage Examples](#-usage-examples)
 - [📚 API Documentation](#-api-documentation)
--
-
----
+- ***
 
 ## ✨ Features
 
@@ -25,8 +23,6 @@ A production-ready request-scoped context management system for NestJS applicati
 - **Logging-friendly** - Formatted context for structured logging
 - **Error handling** - Graceful failures never block requests
 - **Comprehensive tests** - >80% coverage
-
----
 
 ## 📦 Installation
 
@@ -49,8 +45,6 @@ yarn add nestjs-cls uuid@9 class-validator class-transformer
 pnpm add -D @types/uuid
 ```
 
----
-
 ## 🚀 Quick Start
 
 ### 1. Import the Module
@@ -63,19 +57,52 @@ import { ContextModule } from './modules/shared/context';
 
 @Module({
   imports: [
-    // Basic setup with defaults
-    ContextModule.register(),
-
-    // OR with custom configuration
     ContextModule.register({
       adapter: ContextStorageAdapter.CLS,
       userIdSource: UserIdSource.JWT,
       includeRequestDetails: true,
       includeIp: true,
     }),
+
+    // NOTE: No need to manually configure middleware
+    // CLS middleware is automatically set up by ClsModule.forRoot()
+    // which is called inside ContextModule.register()
   ],
 })
 export class AppModule {}
+```
+
+⚠️ Important: No Manual Middleware Setup Required
+The Context Module uses nestjs-cls which automatically sets up middleware through ClsModule.forRoot(). You do NOT need to:
+
+- Call a configure() method
+- Use MiddlewareConsumer
+- Manually apply ContextMiddleware
+
+Everything is handled automatically when you import ContextModule.register().
+
+### How It Works Internally
+
+When you call `ContextModule.register()`, it internally:
+
+1. Imports `ClsModule.forRoot()` with middleware configuration
+2. Sets up the CLS context storage
+3. Configures automatic context extraction on each request
+4. Handles user data extraction based on your `userIdSource` setting
+
+```typescript
+// Inside context.module.ts (you don't need to do this)
+ClsModule.forRoot({
+  global: true,
+  middleware: {
+    mount: true, // Auto-applies to all routes
+    generateId: true, // Auto-generates correlation IDs
+    setup: (cls, req) => {
+      // Auto-extracts context from requests
+      // Context extraction happens here automatically
+    },
+  },
+});
 ```
 
 ### 2. Use in Services
@@ -143,8 +170,6 @@ export class ProjectController {
   }
 }
 ```
-
----
 
 ## ⚙️ Configuration
 
@@ -219,8 +244,6 @@ ContextModule.register({
   },
 });
 ```
-
----
 
 ## 📚 Usage Examples
 
@@ -364,8 +387,6 @@ export class LoggingInterceptor implements NestInterceptor {
 }
 ```
 
----
-
 ## 📖 API Documentation
 
 ### ContextService Methods
@@ -383,8 +404,6 @@ contextService.setMeta({
 });
 ```
 
----
-
 #### `getMeta(): ContextMeta | undefined`
 
 Get complete context metadata.
@@ -394,8 +413,6 @@ const context = contextService.getMeta();
 // Returns: { userId: '123', orgId: 'org-456', ... }
 ```
 
----
-
 #### `updateMeta(partial: Partial<ContextMeta>): void`
 
 Update specific fields in context.
@@ -403,8 +420,6 @@ Update specific fields in context.
 ```typescript
 contextService.updateMeta({ userId: '999' });
 ```
-
----
 
 #### `get<T>(key: keyof ContextMeta): T | undefined`
 
@@ -415,8 +430,6 @@ const userId = contextService.get<string>('userId');
 const path = contextService.get<string>('path');
 ```
 
----
-
 #### `set(key: keyof ContextMeta, value: any): void`
 
 Set specific field in context.
@@ -426,8 +439,6 @@ contextService.set('userId', '456');
 contextService.set('customField', 'value');
 ```
 
----
-
 #### `getUserId(): string | undefined`
 
 Get user ID from context.
@@ -435,8 +446,6 @@ Get user ID from context.
 ```typescript
 const userId = contextService.getUserId();
 ```
-
----
 
 #### `getOrgId(): string | undefined`
 
@@ -446,8 +455,6 @@ Get organization ID from context.
 const orgId = contextService.getOrgId();
 ```
 
----
-
 #### `getCorrelationId(): string`
 
 Get correlation ID from context (always exists).
@@ -455,8 +462,6 @@ Get correlation ID from context (always exists).
 ```typescript
 const correlationId = contextService.getCorrelationId();
 ```
-
----
 
 #### `hasContext(): boolean`
 
@@ -468,8 +473,6 @@ if (contextService.hasContext()) {
 }
 ```
 
----
-
 #### `clear(): void`
 
 Clear current context.
@@ -477,8 +480,6 @@ Clear current context.
 ```typescript
 contextService.clear();
 ```
-
----
 
 #### `getLoggingContext(): Record<string, any>`
 
@@ -488,8 +489,6 @@ Get formatted context for logging.
 const logContext = contextService.getLoggingContext();
 // Returns: { userId, orgId, correlationId, path, method, timestamp }
 ```
-
----
 
 ### ContextMeta Interface
 
@@ -521,8 +520,6 @@ interface ContextMeta {
   [key: string]: any;
 }
 ```
-
----
 
 ## 🔧 Storage Adapters
 
@@ -563,8 +560,6 @@ ContextModule.register({
   adapter: ContextStorageAdapter.ASYNC_HOOKS,
 });
 ```
-
----
 
 ## 🧪 Testing
 
@@ -614,8 +609,6 @@ describe('My Feature', () => {
   });
 });
 ```
-
----
 
 ## 🎯 Best Practices
 
@@ -694,13 +687,39 @@ async callExternalAPI(data: any) {
 }
 ```
 
----
-
 ## 🔧 Troubleshooting
+
+### 1. "Configure() method not found"
+
+**Problem:** Error about missing `configure()` method
+
+**Solution:**
+
+The Context Module does **not** have a `configure()` method. It uses automatic middleware setup via `nestjs-cls`.
+
+```typescript
+// ❌ WRONG - Don't do this
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(ContextMiddleware).forRoutes('*');
+  }
+}
+
+// ✅ CORRECT - Just import the module
+@Module({
+  imports: [
+    ContextModule.register({
+      adapter: ContextStorageAdapter.CLS,
+      userIdSource: UserIdSource.JWT,
+    }),
+  ],
+})
+export class AppModule {}
+```
 
 ### Common Issues
 
-#### 1. Context is Undefined
+### 1. Context is Undefined
 
 **Problem:** `contextService.getMeta()` returns `undefined`
 
@@ -725,9 +744,7 @@ configure(consumer: MiddlewareConsumer) {
 pnpm add nestjs-cls
 ```
 
----
-
-#### 2. User ID Not Extracted
+### 2. User ID Not Extracted
 
 **Problem:** `getUserId()` returns `undefined`
 
@@ -749,9 +766,7 @@ export class AuthMiddleware {
 }
 ```
 
----
-
-#### 3. Context Leaking Between Requests
+### 3. Context Leaking Between Requests
 
 **Problem:** Context from one request appears in another
 
@@ -767,9 +782,7 @@ ContextModule.register({
 pnpm add nestjs-cls
 ```
 
----
-
-#### 4. TypeScript Errors
+### 4. TypeScript Errors
 
 **Problem:** Cannot find module errors
 
@@ -788,8 +801,6 @@ import { ContextModule, ContextService } from './modules/shared/context';
   }
 }
 ```
-
----
 
 ## 📊 Context Data Format
 
@@ -824,8 +835,6 @@ All context metadata follows this standardized format:
   apiVersion: 'v2'
 }
 ```
-
----
 
 ## 🔒 Security Considerations
 
@@ -864,8 +873,6 @@ const context = this.contextService.getLoggingContext();
 this.logger.log('Event occurred', context); // Only logs safe fields
 ```
 
----
-
 ## 📞 Support
 
 For issues, questions, or contributions:
@@ -874,13 +881,9 @@ For issues, questions, or contributions:
 - **Documentation:** This README
 - **Email:** `support@your-domain.com`
 
----
-
 ## 📄 License
 
 This module is [MIT licensed](LICENSE).
-
----
 
 ## 🙏 Acknowledgments
 
@@ -889,8 +892,6 @@ Built with:
 - [NestJS](https://nestjs.com/)
 - [nestjs-cls](https://github.com/Papooch/nestjs-cls)
 - [UUID v9](https://www.npmjs.com/package/uuid)
-
----
 
 **Last Updated:** November 2025  
 **Module Version:** 1.0.0  

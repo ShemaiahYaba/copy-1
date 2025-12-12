@@ -82,21 +82,77 @@ pnpm add -D @types/uuid
 
 ### 1. Configure Sentry (Optional)
 
-In your `main.ts`:
+#### **⚠️ CRITICAL: Environment variables must be loaded BEFORE importing Sentry**
+
+In your `main.ts`, follow this exact order:
 
 ```typescript
-import * as Sentry from '@sentry/nestjs';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
+// src/main.ts
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { AppModule } from './app.module';
+import { EnvironmentConfig } from './config/environment';
+import { corsOptions } from './config/cors';
+import { setupSwagger } from './config/swagger';
+import { logStartupInfo } from './utils/logger';
 
-// Initialize Sentry before creating NestJS app
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  integrations: [nodeProfilingIntegration()],
-  tracesSampleRate: 1.0,
-  profilesSampleRate: 1.0,
-  environment: process.env.NODE_ENV,
+// ⚠️ STEP 1: Load environment variables FIRST
+EnvironmentConfig.initialize(); // This loads .env file
+
+// ⚠️ STEP 2: Import instrument.ts AFTER environment is loaded
+// This is required because instrument.ts uses process.env.SENTRY_DSN
+import './instrument';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // Global Validation Pipe
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
+  // CORS Configuration
+  app.enableCors(corsOptions);
+
+  // Swagger Documentation Setup
+  setupSwagger(app);
+
+  // Start Server
+  const port = EnvironmentConfig.getPort();
+  await app.listen(port);
+
+  // Startup Logs
+  await logStartupInfo(app);
+}
+
+bootstrap().catch((error) => {
+  console.error('❌ Failed to start application:', error);
+  process.exit(1);
 });
 ```
+
+### Why This Order Matters
+
+1. `EnvironmentConfig.initialize()` loads variables from `.env` into `process.env`
+2. `instrument.ts` imports Sentry and reads `process.env.SENTRY_DSN`
+3. If you import `instrument.ts` BEFORE initializing environment, `process.env.SENTRY_DSN` will be undefined
+
+### Common Mistakes
+
+````typescript
+// ❌ WRONG - instrument.ts imported before environment
+import './instrument'; // Will fail - SENTRY_DSN is undefined
+import { EnvironmentConfig } from './config/environment';
+EnvironmentConfig.initialize();
+
+// ✅ CORRECT - environment loaded first
+import { EnvironmentConfig } from './config/environment';
+EnvironmentConfig.initialize();
+import './instrument'; // Now SENTRY_DSN is available
 
 ### 2. Import the Module
 
@@ -104,34 +160,44 @@ In your `app.module.ts`:
 
 ```typescript
 import { Module } from '@nestjs/common';
+import { SentryModule } from '@sentry/nestjs/setup';
 import { ErrorModule } from './modules/shared/error';
 import { NotificationModule } from './modules/shared/notification';
 import { ErrorNotificationStrategy } from './modules/shared/error/dto/error-config.dto';
+import { NotificationAdapter } from '@modules/shared/notification/dto';
 
 @Module({
   imports: [
-    // Import NotificationModule first (ErrorModule depends on it)
+    // 1. Sentry Module (setup must come early)
+    SentryModule.forRoot(),
+
+    // 2. Notification Module (ErrorModule depends on it)
     NotificationModule.register({
-      adapter: 'websocket',
+      adapter: NotificationAdapter.WEBSOCKET,
       persist: true,
-      enableLogging: false,
+      enableLogging: process.env.NODE_ENV === 'development',
     }),
 
-    // Then ErrorModule with Sentry enabled
+    // 3. Error Module with Sentry enabled
     ErrorModule.register({
       includeStackTrace: process.env.NODE_ENV === 'development',
       notifyFrontend: true,
       notificationStrategy: ErrorNotificationStrategy.OPERATIONAL,
       logErrors: true,
       captureContext: true,
-      enableSentry: process.env.NODE_ENV === 'production', // Enable in production
+      enableSentry: process.env.NODE_ENV === 'production', // ✅ Enable in production
     }),
 
-    // Your other modules...
+    // 4. Your other modules
   ],
 })
 export class AppModule {}
-```
+
+// Important Notes:
+// - SentryModule.forRoot() must come before ErrorModule
+// - NotificationModule must come before ErrorModule (dependency)
+// - Environment variables are already loaded from main.ts
+````
 
 ### 3. Use in Services
 
@@ -606,6 +672,50 @@ const error = service.createError(ERROR_CODES.NOT_FOUND, 'Resource not found', {
 ---
 
 ## Error Tracking with Sentry
+
+### 6. Sentry Not Reporting Errors
+
+**Problem:** Errors not appearing in Sentry dashboard
+
+**Solutions:**
+
+```typescript
+// 1. ✅ Verify initialization order in main.ts
+// src/main.ts
+import { EnvironmentConfig } from './config/environment';
+
+// MUST come first
+EnvironmentConfig.initialize();
+
+// MUST come after
+import './instrument';
+
+// 2. ✅ Check DSN is set in .env
+SENTRY_DSN=https://your-key@sentry.io/project-id
+
+// 3. ✅ Verify DSN is valid
+console.log('Sentry DSN:', process.env.SENTRY_DSN);
+
+// 4. ✅ Check enableSentry is true
+ErrorModule.register({
+  enableSentry: true, // Must be true
+});
+
+// 5. ✅ Test manually
+import * as Sentry from '@sentry/nestjs';
+Sentry.captureMessage('Test from bootstrap');
+
+// Common Issue: Wrong Import Order
+// ❌ WRONG - This will cause SENTRY_DSN to be undefined
+import './instrument';
+import { EnvironmentConfig } from './config/environment';
+EnvironmentConfig.initialize();
+
+// ✅ CORRECT
+import { EnvironmentConfig } from './config/environment';
+EnvironmentConfig.initialize();
+import './instrument';
+```
 
 ### Overview
 
@@ -1294,7 +1404,7 @@ import { AppError, ERROR_CODES } from './modules/shared/error';
 }
 ```
 
-#### 6. Sentry Not Reporting Errors
+#### 6. Sentry Not Reporting Errors (Sentry Module)
 
 **Problem:** Errors not appearing in Sentry dashboard
 
