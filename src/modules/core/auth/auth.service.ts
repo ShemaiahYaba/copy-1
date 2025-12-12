@@ -545,7 +545,7 @@ export class AuthService {
     error: unknown,
     defaultMessage: string,
   ): AppError {
-    const err = error as Error & { message?: string };
+    const err = error as Error & { message?: string; status?: number };
 
     if (err.message?.includes('already registered')) {
       return new AppError(
