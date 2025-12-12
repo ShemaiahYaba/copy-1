@@ -15,12 +15,15 @@ import {
   RegisterSupervisorDto,
   RegisterStudentDto,
   RegisterUniversityDto,
-  LoginDto,
   AuthResponseDto,
   UserResponseDto,
+  VerifyOTPDto,
+  InitiateOTPLoginDto,
+  ResendOTPDto,
+  OTPSentResponseDto,
+  RegistrationPendingResponseDto,
 } from './dto/register.dto';
 
-// Type for profile responses
 type ProfileResponse =
   | { id: string; organizationName: string; industry?: string }
   | { id: string; universityId: string; employmentStatus: string }
@@ -44,14 +47,15 @@ export class AuthService {
   ) {}
 
   // ==========================================================================
-  // REGISTRATION METHODS
+  // REGISTRATION WITH OTP FLOW
   // ==========================================================================
 
   /**
-   * Register new client
+   * Register new client - Step 1: Create account and send OTP
    */
-  async registerClient(dto: RegisterClientDto): Promise<AuthResponseDto> {
-    // Check if email exists in our database
+  async registerClient(
+    dto: RegisterClientDto,
+  ): Promise<RegistrationPendingResponseDto> {
     const existing = await this.userService.findByEmail(dto.email);
     if (existing) {
       throw new AppError(
@@ -62,31 +66,24 @@ export class AuthService {
     }
 
     try {
-      // 1. Create user in Supabase Auth
+      // 1. Create user in Supabase (NOT confirmed, OTP will be sent)
       const supabaseUser = await this.supabaseService.createUser(
         dto.email,
         dto.password,
         { name: dto.organizationName },
       );
 
-      // 2. Create session (login the user)
-      const { session } = await this.supabaseService.signInWithPassword(
-        dto.email,
-        dto.password,
-      );
+      // 2. Send OTP for verification
+      await this.supabaseService.sendOTP(dto.email, 'signup');
 
-      if (!session) {
-        throw new Error('Failed to create session after registration');
-      }
-
-      // 3. Create user + client profile in our database
-      const { user, client } = await this.userService.createClient(
+      // 3. Create user + client profile in database (but mark as unverified)
+      const { user } = await this.userService.createClient(
         {
           id: supabaseUser.id,
           email: dto.email,
           name: dto.organizationName,
           role: 'client',
-          emailVerified: supabaseUser.email_confirmed_at !== null,
+          emailVerified: false, // ✅ Not verified until OTP is confirmed
         },
         {
           organizationName: dto.organizationName,
@@ -95,38 +92,20 @@ export class AuthService {
         },
       );
 
-      // 4. Populate context
-      this.contextService.setMeta({
-        userId: user.id,
-        username: user.name || user.email.split('@')[0],
-        email: user.email,
-        orgId: client.id,
-        correlationId: uuidv4(),
-        timestamp: new Date(),
-      });
-
-      // 5. Send success notification
       await this.notificationService.push({
-        type: NotificationType.SUCCESS,
-        message: 'Account created successfully! Welcome to Gradlinq.',
-        context: { userId: user.id, role: user.role },
+        type: NotificationType.INFO,
+        message:
+          'Account created! Please check your email for the verification code.',
+        context: { userId: user.id, email: user.email },
       });
 
-      this.logger.log(`Client registered: ${user.email}`);
+      this.logger.log(`Client registration pending OTP: ${user.email}`);
 
-      // 6. Return response
       return {
-        user: this.mapUserResponse(user),
-        session: {
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token,
-          expiresAt: session.expires_at!,
-        },
-        profile: {
-          id: client.id,
-          organizationName: client.organizationName,
-          industry: client.industry || undefined,
-        },
+        message: 'Account created. Please verify your email with the OTP sent.',
+        email: user.email,
+        userId: user.id,
+        otpSent: true,
       };
     } catch (error) {
       this.logger.error('Client registration failed:', error);
@@ -135,44 +114,94 @@ export class AuthService {
   }
 
   /**
-   * Register new supervisor
+   * Verify OTP after registration - Step 2: Complete registration
+   */
+  async verifyRegistrationOTP(dto: VerifyOTPDto): Promise<AuthResponseDto> {
+    try {
+      // 1. Verify OTP with Supabase (this creates the session)
+      const { session, user: supabaseUser } =
+        await this.supabaseService.verifyOTP(dto.email, dto.token);
+
+      if (!session || !supabaseUser) {
+        throw new Error('OTP verification failed');
+      }
+
+      // 2. Update user in our database as verified
+      const user = await this.userService.findById(supabaseUser.id);
+      if (!user) {
+        throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'User not found');
+      }
+
+      // Mark email as verified
+      await this.userService.updateUser(user.id, { emailVerified: true });
+
+      // 3. Get user profile
+      const { profile } = await this.userService.getUserWithProfile(user.id);
+      const orgId = this.getOrgId(user.role, profile);
+
+      // 4. Populate context
+      this.contextService.setMeta({
+        userId: user.id,
+        username: user.name || user.email.split('@')[0],
+        email: user.email,
+        orgId,
+        correlationId: uuidv4(),
+        timestamp: new Date(),
+      });
+
+      // 5. Send success notification
+      await this.notificationService.push({
+        type: NotificationType.SUCCESS,
+        message: 'Email verified successfully! Welcome to Gradlinq.',
+        context: { userId: user.id, role: user.role },
+      });
+
+      this.logger.log(`Registration completed for: ${user.email}`);
+
+      // Map user response with the updated email verification status
+      const updatedUser = await this.userService.updateUser(user.id, {
+        emailVerified: true,
+      });
+
+      return {
+        user: this.mapUserResponse(updatedUser),
+        session: {
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt: session.expires_at!,
+        },
+        profile: this.mapProfile(updatedUser.role, profile),
+      };
+    } catch (error) {
+      this.logger.error('OTP verification failed:', error);
+      throw this.handleSupabaseError(error, 'Invalid or expired OTP');
+    }
+  }
+
+  /**
+   * Register supervisor with OTP
    */
   async registerSupervisor(
     dto: RegisterSupervisorDto,
-  ): Promise<AuthResponseDto> {
+  ): Promise<RegistrationPendingResponseDto> {
     const existing = await this.userService.findByEmail(dto.email);
     if (existing) {
-      throw new AppError(
-        ERROR_CODES.ALREADY_EXISTS,
-        'User with this email already exists',
-        { email: dto.email },
-      );
+      throw new AppError(ERROR_CODES.ALREADY_EXISTS, 'User already exists');
     }
 
     try {
-      // 1. Create user in Supabase Auth
       const supabaseUser = await this.supabaseService.createUser(
         dto.email,
         dto.password,
       );
+      await this.supabaseService.sendOTP(dto.email, 'signup');
 
-      // 2. Create session
-      const { session } = await this.supabaseService.signInWithPassword(
-        dto.email,
-        dto.password,
-      );
-
-      if (!session) {
-        throw new Error('Failed to create session after registration');
-      }
-
-      // 3. Create user + supervisor profile in our database
-      const { user, supervisor } = await this.userService.createSupervisor(
+      const { user } = await this.userService.createSupervisor(
         {
           id: supabaseUser.id,
           email: dto.email,
           role: 'supervisor',
-          emailVerified: supabaseUser.email_confirmed_at !== null,
+          emailVerified: false,
         },
         {
           universityId: dto.universityId,
@@ -180,82 +209,45 @@ export class AuthService {
         },
       );
 
-      // 4. Populate context
-      this.contextService.setMeta({
-        userId: user.id,
-        email: user.email,
-        orgId: supervisor.universityId,
-        correlationId: uuidv4(),
-        timestamp: new Date(),
-      });
-
-      // 5. Send notification
-      await this.notificationService.push({
-        type: NotificationType.SUCCESS,
-        message: 'Supervisor account created successfully!',
-        context: { userId: user.id, role: user.role },
-      });
-
-      this.logger.log(`Supervisor registered: ${user.email}`);
+      this.logger.log(`Supervisor registration pending OTP: ${user.email}`);
 
       return {
-        user: this.mapUserResponse(user),
-        session: {
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token,
-          expiresAt: session.expires_at!,
-        },
-        profile: {
-          id: supervisor.id,
-          universityId: supervisor.universityId,
-          employmentStatus: supervisor.employmentStatus,
-        },
+        message: 'Account created. Please verify your email with the OTP sent.',
+        email: user.email,
+        userId: user.id,
+        otpSent: true,
       };
     } catch (error) {
-      this.logger.error('Supervisor registration failed:', error);
       throw this.handleSupabaseError(error, 'Registration failed');
     }
   }
 
   /**
-   * Register new student
+   * Register student with OTP
    */
-  async registerStudent(dto: RegisterStudentDto): Promise<AuthResponseDto> {
+  async registerStudent(
+    dto: RegisterStudentDto,
+  ): Promise<RegistrationPendingResponseDto> {
     const existing = await this.userService.findByEmail(dto.email);
     if (existing) {
-      throw new AppError(
-        ERROR_CODES.ALREADY_EXISTS,
-        'User with this email already exists',
-        { email: dto.email },
-      );
+      throw new AppError(ERROR_CODES.ALREADY_EXISTS, 'User already exists');
     }
 
     try {
-      // 1. Create user in Supabase Auth
       const supabaseUser = await this.supabaseService.createUser(
         dto.email,
         dto.password,
         { name: dto.matricNumber },
       );
+      await this.supabaseService.sendOTP(dto.email, 'signup');
 
-      // 2. Create session
-      const { session } = await this.supabaseService.signInWithPassword(
-        dto.email,
-        dto.password,
-      );
-
-      if (!session) {
-        throw new Error('Failed to create session after registration');
-      }
-
-      // 3. Create user + student profile
-      const { user, student } = await this.userService.createStudent(
+      const { user } = await this.userService.createStudent(
         {
           id: supabaseUser.id,
           email: dto.email,
           name: dto.matricNumber,
           role: 'student',
-          emailVerified: supabaseUser.email_confirmed_at !== null,
+          emailVerified: false,
         },
         {
           matricNumber: dto.matricNumber,
@@ -263,85 +255,45 @@ export class AuthService {
         },
       );
 
-      // 4. Populate context
-      this.contextService.setMeta({
-        userId: user.id,
-        email: user.email,
-        correlationId: uuidv4(),
-        timestamp: new Date(),
-      });
-
-      // 5. Send notification
-      await this.notificationService.push({
-        type: NotificationType.SUCCESS,
-        message:
-          'Student account created successfully! Start exploring opportunities.',
-        context: { userId: user.id, role: user.role },
-      });
-
-      this.logger.log(`Student registered: ${user.email}`);
+      this.logger.log(`Student registration pending OTP: ${user.email}`);
 
       return {
-        user: this.mapUserResponse(user),
-        session: {
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token,
-          expiresAt: session.expires_at!,
-        },
-        profile: {
-          id: student.id,
-          matricNumber: student.matricNumber,
-          graduationStatus: student.graduationStatus,
-          skills: student.skills || undefined,
-        },
+        message: 'Account created. Please verify your email with the OTP sent.',
+        email: user.email,
+        userId: user.id,
+        otpSent: true,
       };
     } catch (error) {
-      this.logger.error('Student registration failed:', error);
       throw this.handleSupabaseError(error, 'Registration failed');
     }
   }
 
   /**
-   * Register new university
+   * Register university with OTP
    */
   async registerUniversity(
     dto: RegisterUniversityDto,
-  ): Promise<AuthResponseDto> {
+  ): Promise<RegistrationPendingResponseDto> {
     const existing = await this.userService.findByEmail(dto.email);
     if (existing) {
-      throw new AppError(
-        ERROR_CODES.ALREADY_EXISTS,
-        'User with this email already exists',
-        { email: dto.email },
-      );
+      throw new AppError(ERROR_CODES.ALREADY_EXISTS, 'User already exists');
     }
 
     try {
-      // 1. Create user in Supabase Auth
       const supabaseUser = await this.supabaseService.createUser(
         dto.email,
         dto.password,
         { name: dto.name },
       );
+      await this.supabaseService.sendOTP(dto.email, 'signup');
 
-      // 2. Create session
-      const { session } = await this.supabaseService.signInWithPassword(
-        dto.email,
-        dto.password,
-      );
-
-      if (!session) {
-        throw new Error('Failed to create session after registration');
-      }
-
-      // 3. Create user + university profile
-      const { user, university } = await this.userService.createUniversity(
+      const { user } = await this.userService.createUniversity(
         {
           id: supabaseUser.id,
           email: dto.email,
           name: dto.name,
           role: 'university',
-          emailVerified: supabaseUser.email_confirmed_at !== null,
+          emailVerified: false,
         },
         {
           name: dto.name,
@@ -350,70 +302,87 @@ export class AuthService {
         },
       );
 
-      // 4. Populate context
-      this.contextService.setMeta({
-        userId: user.id,
-        email: user.email,
-        orgId: university.id,
-        correlationId: uuidv4(),
-        timestamp: new Date(),
-      });
-
-      // 5. Send notification
-      await this.notificationService.push({
-        type: NotificationType.SUCCESS,
-        message: 'University account created successfully!',
-        context: { userId: user.id, role: user.role },
-      });
-
-      this.logger.log(`University registered: ${user.email}`);
+      this.logger.log(`University registration pending OTP: ${user.email}`);
 
       return {
-        user: this.mapUserResponse(user),
-        session: {
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token,
-          expiresAt: session.expires_at!,
-        },
-        profile: {
-          id: university.id,
-          name: university.name,
-          location: university.location || undefined,
-          isVerified: university.isVerified,
-        },
+        message: 'Account created. Please verify your email with the OTP sent.',
+        email: user.email,
+        userId: user.id,
+        otpSent: true,
       };
     } catch (error) {
-      this.logger.error('University registration failed:', error);
       throw this.handleSupabaseError(error, 'Registration failed');
     }
   }
 
   // ==========================================================================
-  // AUTHENTICATION METHODS
+  // LOGIN WITH OTP FLOW
   // ==========================================================================
 
   /**
-   * Login user (unified for all roles)
+   * Initiate login - Step 1: Send OTP
    */
-  async login(dto: LoginDto): Promise<AuthResponseDto> {
+  async initiateOTPLogin(
+    dto: InitiateOTPLoginDto,
+  ): Promise<OTPSentResponseDto> {
     try {
-      // 1. Authenticate with Supabase
-      const { session, user: supabaseUser } =
-        await this.supabaseService.signInWithPassword(dto.email, dto.password);
-
-      if (!session || !supabaseUser) {
-        throw new Error('Invalid credentials');
+      // Verify user exists in our database
+      const user = await this.userService.findByEmail(dto.email);
+      if (!user) {
+        throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'User not found');
       }
 
-      // 2. Find user in our database
-      const user = await this.userService.findById(supabaseUser.id);
-
-      if (!user) {
+      // Check if account is active
+      if (!user.isActive) {
         throw new AppError(
-          ERROR_CODES.RESOURCE_NOT_FOUND,
-          'User profile not found',
-          { supabaseId: supabaseUser.id },
+          ERROR_CODES.OPERATION_NOT_ALLOWED,
+          'Account is inactive',
         );
+      }
+
+      // Send OTP via Supabase
+      await this.supabaseService.initiateOTPLogin(dto.email);
+
+      await this.notificationService.push({
+        type: NotificationType.INFO,
+        message: 'OTP sent to your email. Please check your inbox.',
+        context: { email: dto.email },
+      });
+
+      this.logger.log(`OTP login initiated for: ${dto.email}`);
+
+      return {
+        message: 'OTP sent successfully to your email',
+        email: dto.email,
+        expiresIn: 600, // 10 minutes
+      };
+    } catch (error) {
+      this.logger.error('Failed to send OTP:', error);
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        ERROR_CODES.INTERNAL_SERVER_ERROR,
+        'Failed to send OTP',
+      );
+    }
+  }
+
+  /**
+   * Complete login - Step 2: Verify OTP
+   */
+  async verifyLoginOTP(dto: VerifyOTPDto): Promise<AuthResponseDto> {
+    try {
+      // 1. Verify OTP with Supabase
+      const { session, user: supabaseUser } =
+        await this.supabaseService.completeOTPLogin(dto.email, dto.token);
+
+      if (!session || !supabaseUser) {
+        throw new Error('OTP verification failed');
+      }
+
+      // 2. Get user from our database
+      const user = await this.userService.findById(supabaseUser.id);
+      if (!user) {
+        throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'User not found');
       }
 
       // 3. Check if account is active
@@ -421,7 +390,6 @@ export class AuthService {
         throw new AppError(
           ERROR_CODES.OPERATION_NOT_ALLOWED,
           'Account is inactive',
-          { userId: user.id },
         );
       }
 
@@ -443,14 +411,10 @@ export class AuthService {
       await this.notificationService.push({
         type: NotificationType.SUCCESS,
         message: `Welcome back, ${user.email}!`,
-        context: {
-          userId: user.id,
-          role: user.role,
-          loginTime: new Date().toISOString(),
-        },
+        context: { userId: user.id, role: user.role },
       });
 
-      this.logger.log(`User logged in: ${user.email}`);
+      this.logger.log(`User logged in via OTP: ${user.email}`);
 
       return {
         user: this.mapUserResponse(user),
@@ -462,29 +426,49 @@ export class AuthService {
         profile: this.mapProfile(user.role, profile),
       };
     } catch (error) {
-      this.logger.error('Login failed:', error);
-
+      this.logger.error('OTP login failed:', error);
       await this.notificationService.push({
         type: NotificationType.ERROR,
-        message: 'Login failed. Please check your credentials.',
+        message: 'Login failed. Invalid or expired OTP.',
         context: { email: dto.email },
       });
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      throw new AppError(
-        ERROR_CODES.INVALID_CREDENTIALS,
-        'Invalid email or password',
-        { email: dto.email },
-      );
+      throw this.handleSupabaseError(error, 'Invalid or expired OTP');
     }
   }
 
   /**
-   * Logout user
+   * Resend OTP
    */
+  async resendOTP(dto: ResendOTPDto): Promise<OTPSentResponseDto> {
+    try {
+      await this.supabaseService.resendOTP(dto.email);
+
+      await this.notificationService.push({
+        type: NotificationType.INFO,
+        message: 'New OTP sent to your email.',
+        context: { email: dto.email },
+      });
+
+      this.logger.log(`OTP resent to: ${dto.email}`);
+
+      return {
+        message: 'OTP sent successfully to your email',
+        email: dto.email,
+        expiresIn: 600,
+      };
+    } catch (error) {
+      this.logger.error('Failed to resend OTP:', error);
+      throw new AppError(
+        ERROR_CODES.INTERNAL_SERVER_ERROR,
+        'Failed to resend OTP',
+      );
+    }
+  }
+
+  // ==========================================================================
+  // OTHER AUTH METHODS (Unchanged)
+  // ==========================================================================
+
   async logout(accessToken: string, userId?: string): Promise<void> {
     try {
       await this.supabaseService.signOut(accessToken);
@@ -495,7 +479,6 @@ export class AuthService {
           message: 'You have been logged out successfully.',
           context: { userId },
         });
-
         this.logger.log(`User logged out: ${userId}`);
       }
     } catch (error) {
@@ -504,9 +487,6 @@ export class AuthService {
     }
   }
 
-  /**
-   * Refresh access token
-   */
   async refreshToken(refreshToken: string): Promise<{
     accessToken: string;
     refreshToken: string;
@@ -515,18 +495,14 @@ export class AuthService {
     try {
       const { session } =
         await this.supabaseService.refreshSession(refreshToken);
-
-      if (!session) {
-        throw new Error('Failed to refresh session');
-      }
+      if (!session) throw new Error('Failed to refresh session');
 
       return {
         accessToken: session.access_token,
         refreshToken: session.refresh_token,
         expiresAt: session.expires_at!,
       };
-    } catch (error) {
-      this.logger.error('Token refresh failed:', error);
+    } catch {
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
         'Invalid or expired refresh token',
@@ -534,25 +510,18 @@ export class AuthService {
     }
   }
 
-  /**
-   * Verify session and get user
-   */
   async verifySession(accessToken: string): Promise<{
     user: UserResponseDto;
     profile: ProfileResponse | undefined;
   }> {
     try {
-      // 1. Verify token with Supabase
       const supabaseUser = await this.supabaseService.verifyToken(accessToken);
-
-      // 2. Get user from our database
       const user = await this.userService.findById(supabaseUser.id);
 
       if (!user) {
         throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'User not found');
       }
 
-      // 3. Get profile
       const { profile } = await this.userService.getUserWithProfile(user.id);
 
       return {
@@ -560,11 +529,7 @@ export class AuthService {
         profile: this.mapProfile(user.role, profile),
       };
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      this.logger.error('Session verification failed:', error);
+      if (error instanceof AppError) throw error;
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
         'Invalid or expired session',
@@ -588,24 +553,13 @@ export class AuthService {
         'Email already registered',
       );
     }
-
-    if (err.message?.includes('Invalid login credentials')) {
+    if (err.message?.includes('Invalid') || err.message?.includes('expired')) {
       return new AppError(
         ERROR_CODES.INVALID_CREDENTIALS,
-        'Invalid credentials',
+        'Invalid or expired OTP',
       );
     }
-
-    if (err.message?.includes('Email not confirmed')) {
-      return new AppError(
-        ERROR_CODES.OPERATION_NOT_ALLOWED,
-        'Email not confirmed',
-      );
-    }
-
-    if (error instanceof AppError) {
-      return error;
-    }
+    if (error instanceof AppError) return error;
 
     return new AppError(ERROR_CODES.INTERNAL_SERVER_ERROR, defaultMessage, {
       error: err.message || 'Unknown error',
