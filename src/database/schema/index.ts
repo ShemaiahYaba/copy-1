@@ -14,6 +14,9 @@ export {
   graduationStatusEnum,
 } from '@modules/core/auth/models/user.model';
 
+export { bookmarks } from '@modules/bookmarks/models/bookmark.model';
+export { projects } from '@modules/projects/models/project.model';
+
 // Export types for use elsewhere
 export type {
   User,
@@ -30,3 +33,16 @@ export type {
   EmploymentStatus,
   GraduationStatus,
 } from '@modules/core/auth/models/user.model';
+
+export type {
+  Bookmark,
+  NewBookmark,
+} from '@modules/bookmarks/models/bookmark.model';
+
+export type {
+  Project,
+  NewProject,
+  ProjectStatus,
+  ProjectApprovalStatus,
+  ProjectCategory,
+} from '@modules/projects/models/project.model';

@@ -4,7 +4,7 @@
 - implement validation error filters
 - implement custom error filters
 
-# Recommendation for Now
+## Recommendation for Now
 
 - Since you’re building the foundational Context/Notification/Error system, start without GraphQL.
 - Make it REST + WebSocket-ready.
