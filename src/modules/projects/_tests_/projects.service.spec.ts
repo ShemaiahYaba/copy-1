@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProjectsService } from '../projects.service';
 import { DatabaseService } from '@database/database.service';
@@ -13,16 +16,10 @@ describe('ProjectsService', () => {
   beforeEach(async () => {
     mockDb = {
       db: {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        insert: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockResolvedValue([]),
-        update: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        delete: jest.fn().mockReturnThis(),
+        select: jest.fn(),
+        insert: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
       },
     };
 
@@ -56,11 +53,27 @@ describe('ProjectsService', () => {
       id: 'project-123',
       title: 'Test Project',
       status: 'draft',
+      approvalStatus: 'pending',
+      isPublished: false,
+      clientId: 'client-123',
+      createdBy: 'user-123',
+      category: 'web_development',
     };
 
-    mockDb.db.returning
-      .mockResolvedValueOnce([mockClient])
-      .mockResolvedValueOnce([mockProject]);
+    // Mock the client lookup query
+    const selectChain = {
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([mockClient]),
+    };
+    mockDb.db.select.mockReturnValue(selectChain);
+
+    // Mock the insert query
+    const insertChain = {
+      values: jest.fn().mockReturnThis(),
+      returning: jest.fn().mockResolvedValue([mockProject]),
+    };
+    mockDb.db.insert.mockReturnValue(insertChain);
 
     const result = await service.create({
       title: 'Test Project',
@@ -71,8 +84,46 @@ describe('ProjectsService', () => {
     });
 
     expect(result).toEqual(mockProject);
-    expect(mockNotification.push).toHaveBeenCalled();
+    expect(mockNotification.push).toHaveBeenCalledWith({
+      type: expect.any(String),
+      message: expect.stringContaining('created successfully'),
+      context: { projectId: 'project-123' },
+    });
+    expect(mockDb.db.select).toHaveBeenCalled();
+    expect(mockDb.db.insert).toHaveBeenCalled();
   });
 
-  // Add more tests...
+  it('should throw error when user is not authenticated', async () => {
+    mockContext.getUserId.mockReturnValue(null);
+
+    await expect(
+      service.create({
+        title: 'Test Project',
+        description: 'Test description',
+        requiredSkills: ['JavaScript'],
+        duration: 12,
+        category: 'web_development',
+      }),
+    ).rejects.toThrow('User must be authenticated');
+  });
+
+  it('should throw error when user is not a client', async () => {
+    // Mock empty client result
+    const selectChain = {
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([]),
+    };
+    mockDb.db.select.mockReturnValue(selectChain);
+
+    await expect(
+      service.create({
+        title: 'Test Project',
+        description: 'Test description',
+        requiredSkills: ['JavaScript'],
+        duration: 12,
+        category: 'web_development',
+      }),
+    ).rejects.toThrow('Only clients can create projects');
+  });
 });

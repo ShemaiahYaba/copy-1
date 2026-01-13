@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/unbound-method */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // ============================================================================
 // PART 9: UNIT TESTS
 // src/modules/bookmarks/bookmarks.service.spec.ts
@@ -61,31 +63,34 @@ describe('BookmarksService', () => {
         createdAt: new Date(),
       };
 
-      // Mock project exists
-      mockDb.db.select = jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([mockProject]),
-      });
+      // Create separate select mock implementations for each query
+      let selectCallCount = 0;
+      mockDb.db.select = jest.fn().mockImplementation(() => {
+        selectCallCount++;
 
-      // Mock bookmark doesn't exist
-      mockDb.db.select = jest
-        .fn()
-        .mockReturnValueOnce({
+        const chain = {
           from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([mockProject]),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([]), // No existing bookmark
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([{ count: 5 }]), // Count query
-        });
+          where: jest.fn(),
+          limit: jest.fn(),
+        };
+
+        // First call: project lookup (has limit)
+        if (selectCallCount === 1) {
+          chain.where.mockReturnThis();
+          chain.limit.mockResolvedValue([mockProject]);
+        }
+        // Second call: existing bookmark check (has limit)
+        else if (selectCallCount === 2) {
+          chain.where.mockReturnThis();
+          chain.limit.mockResolvedValue([]);
+        }
+        // Third call: count query (NO limit, ends at where)
+        else if (selectCallCount === 3) {
+          chain.where.mockResolvedValue([{ count: 5 }]);
+        }
+
+        return chain;
+      });
 
       // Mock insert
       mockDb.db.insert = jest.fn().mockReturnValue({
@@ -112,11 +117,11 @@ describe('BookmarksService', () => {
     });
 
     it('should throw error if project not found', async () => {
-      mockDb.db.select = jest.fn().mockReturnValue({
+      mockDb.db.select = jest.fn().mockImplementation(() => ({
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([]), // No project
-      });
+        limit: jest.fn().mockResolvedValue([]),
+      }));
 
       await expect(
         service.create({ projectId: mockProjectId }),
@@ -127,18 +132,24 @@ describe('BookmarksService', () => {
       const mockProject = { id: mockProjectId };
       const existingBookmark = { id: 'bookmark-123' };
 
-      mockDb.db.select = jest
-        .fn()
-        .mockReturnValueOnce({
+      let selectCallCount = 0;
+      mockDb.db.select = jest.fn().mockImplementation(() => {
+        selectCallCount++;
+
+        const chain = {
           from: jest.fn().mockReturnThis(),
           where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([mockProject]),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([existingBookmark]),
-        });
+          limit: jest.fn(),
+        };
+
+        if (selectCallCount === 1) {
+          chain.limit.mockResolvedValue([mockProject]);
+        } else if (selectCallCount === 2) {
+          chain.limit.mockResolvedValue([existingBookmark]);
+        }
+
+        return chain;
+      });
 
       await expect(
         service.create({ projectId: mockProjectId }),
@@ -148,23 +159,33 @@ describe('BookmarksService', () => {
     it('should throw error if bookmark limit reached', async () => {
       const mockProject = { id: mockProjectId };
 
-      mockDb.db.select = jest
-        .fn()
-        .mockReturnValueOnce({
+      let selectCallCount = 0;
+      mockDb.db.select = jest.fn().mockImplementation(() => {
+        selectCallCount++;
+
+        const chain = {
           from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([mockProject]),
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([]), // No existing
-        })
-        .mockReturnValueOnce({
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([{ count: 100 }]), // At limit
-        });
+          where: jest.fn(),
+          limit: jest.fn(),
+        };
+
+        // First call: project lookup (has limit)
+        if (selectCallCount === 1) {
+          chain.where.mockReturnThis();
+          chain.limit.mockResolvedValue([mockProject]);
+        }
+        // Second call: existing bookmark check (has limit)
+        else if (selectCallCount === 2) {
+          chain.where.mockReturnThis();
+          chain.limit.mockResolvedValue([]);
+        }
+        // Third call: count query (NO limit, ends at where)
+        else if (selectCallCount === 3) {
+          chain.where.mockResolvedValue([{ count: 100 }]);
+        }
+
+        return chain;
+      });
 
       await expect(
         service.create({ projectId: mockProjectId }),
@@ -181,11 +202,11 @@ describe('BookmarksService', () => {
         projectId: mockProjectId,
       };
 
-      mockDb.db.select = jest.fn().mockReturnValue({
+      mockDb.db.select = jest.fn().mockImplementation(() => ({
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         limit: jest.fn().mockResolvedValue([mockBookmark]),
-      });
+      }));
 
       mockDb.db.delete = jest.fn().mockReturnValue({
         where: jest.fn().mockResolvedValue(undefined),
@@ -202,11 +223,11 @@ describe('BookmarksService', () => {
     });
 
     it('should throw error if bookmark not found', async () => {
-      mockDb.db.select = jest.fn().mockReturnValue({
+      mockDb.db.select = jest.fn().mockImplementation(() => ({
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         limit: jest.fn().mockResolvedValue([]),
-      });
+      }));
 
       await expect(service.remove('invalid-id')).rejects.toThrow(
         'Bookmark not found',
@@ -220,11 +241,11 @@ describe('BookmarksService', () => {
         projectId: mockProjectId,
       };
 
-      mockDb.db.select = jest.fn().mockReturnValue({
+      mockDb.db.select = jest.fn().mockImplementation(() => ({
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         limit: jest.fn().mockResolvedValue([mockBookmark]),
-      });
+      }));
 
       await expect(service.remove('bookmark-123')).rejects.toThrow(
         'You can only delete your own bookmarks',
@@ -244,11 +265,11 @@ describe('BookmarksService', () => {
         projectId: mockProjectId,
       }));
 
-      mockDb.db.select = jest.fn().mockReturnValue({
+      // Mock select WITHOUT limit - bulkDelete doesn't use limit
+      mockDb.db.select = jest.fn().mockImplementation(() => ({
         from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue(mockBookmarks),
-      });
+        where: jest.fn().mockResolvedValue(mockBookmarks),
+      }));
 
       mockDb.db.delete = jest.fn().mockReturnValue({
         where: jest.fn().mockResolvedValue(undefined),
@@ -265,16 +286,16 @@ describe('BookmarksService', () => {
         bookmarkIds: ['bookmark-1', 'bookmark-2', 'invalid-3'],
       };
 
+      // Only return 2 bookmarks (not matching the requested 3)
       const mockBookmarks = [
         { id: 'bookmark-1', studentId: mockStudentId },
         { id: 'bookmark-2', studentId: mockStudentId },
       ];
 
-      mockDb.db.select = jest.fn().mockReturnValue({
+      mockDb.db.select = jest.fn().mockImplementation(() => ({
         from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue(mockBookmarks),
-      });
+        where: jest.fn().mockResolvedValue(mockBookmarks),
+      }));
 
       await expect(service.bulkDelete(dto)).rejects.toThrow(
         'Some bookmark IDs are invalid',
@@ -284,11 +305,10 @@ describe('BookmarksService', () => {
 
   describe('getCount', () => {
     it('should return bookmark count', async () => {
-      mockDb.db.select = jest.fn().mockReturnValue({
+      mockDb.db.select = jest.fn().mockImplementation(() => ({
         from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([{ count: 42 }]),
-      });
+        where: jest.fn().mockResolvedValue([{ count: 42 }]),
+      }));
 
       const count = await service.getCount();
 
