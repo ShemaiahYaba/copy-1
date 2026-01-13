@@ -162,7 +162,7 @@ export class CreateUserDto {
 
 ## 🔐 Authentication
 
-### For endpoints that DON'T require auth:
+### For endpoints that DON'T require auth
 
 ```typescript
 @Get('public')
@@ -170,7 +170,7 @@ export class CreateUserDto {
 findPublicUsers() { }
 ```
 
-### For login/register endpoints:
+### For login/register endpoints
 
 ```typescript
 import { ApiLogin, ApiRegister } from '@common/decorators/api-docs.decorator';

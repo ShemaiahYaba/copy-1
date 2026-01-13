@@ -13,7 +13,11 @@ import { NotificationModule } from './modules/shared/notification/notification.m
 import { ErrorNotificationStrategy } from './modules/shared/error/dto/error-config.dto';
 import { NotificationAdapter } from '@modules/shared/notification/dto';
 import { AuthModule } from '@modules/core/auth/auth.module';
+import { ProjectsModule } from './modules/projects/projects.module';
+import { BookmarksModule } from '@modules/bookmarks/bookmarks.module';
+
 import * as dotenv from 'dotenv';
+
 dotenv.config();
 
 @Module({
@@ -41,6 +45,8 @@ dotenv.config();
     }),
     DatabaseModule,
     AuthModule,
+    ProjectsModule,
+    BookmarksModule,
 
     // 4. Your other modules
   ],
