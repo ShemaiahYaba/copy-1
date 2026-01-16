@@ -10,9 +10,24 @@ import {
   ProjectStatus,
   ProjectApprovalStatus,
   ProjectCategory,
+  ProjectDifficulty,
+  ProjectVisibility,
+  Project,
+  NewProject,
 } from './models/project.model';
 import { clients } from '@modules/core/auth/models/user.model';
-import { eq, and, or, ilike, desc, asc, isNull, count, sql } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  or,
+  ilike,
+  desc,
+  asc,
+  isNull,
+  count,
+  sql,
+  lt,
+} from 'drizzle-orm';
 import { ContextService } from '@modules/shared/context/context.service';
 import { NotificationService } from '@modules/shared/notification/notification.service';
 import { NotificationType } from '@modules/shared/notification/interfaces';
@@ -21,6 +36,18 @@ import { AppError } from '@shared/error/classes/app-error.class';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { FilterProjectsDto } from './dto/filter-projects.dto';
+import {
+  CursorPaginationInput,
+  ProjectFeedFilterInput,
+} from './dto/student-feed.dto';
+import {
+  ProjectCardEntity,
+  ProjectFiltersMetaEntity,
+  StudentProjectFeedResponse,
+  ProjectPageInfo,
+  StudentProjectFeedSearchResult,
+} from './entities/project.entity';
+import { SQL } from 'drizzle-orm';
 
 const validSortFields = [
   'createdAt',
@@ -70,17 +97,46 @@ export class ProjectsService {
       );
     }
 
+    const insertData: NewProject = {
+      clientId: client.id,
+      createdBy: userId,
+      title: dto.title,
+      description: dto.description,
+      organization: dto.organization,
+      organizationLogoUrl: dto.organizationLogoUrl,
+      objectives: dto.objectives,
+      deliverables: dto.deliverables,
+      requiredSkills: dto.requiredSkills,
+      preferredSkills: dto.preferredSkills,
+      experienceLevel: dto.experienceLevel,
+      learnerRequirements: dto.learnerRequirements,
+      expectedOutcomes: dto.expectedOutcomes,
+      additionalResources: dto.additionalResources,
+      contactPersons: dto.contactPersons,
+      duration: dto.duration,
+      startDate: dto.startDate,
+      deadline: dto.deadline,
+      isFlexibleTimeline: dto.isFlexibleTimeline ?? false,
+      teamSize: dto.teamSize ?? 1,
+      maxApplicants: dto.maxApplicants,
+      status: 'draft',
+      approvalStatus: 'pending',
+      category: dto.category as ProjectCategory,
+      tags: dto.tags,
+      industry: dto.industry,
+      isPublished: false,
+      isRemote: dto.isRemote ?? false,
+      location: dto.location,
+      budget: dto.budget,
+      compensationType: dto.compensationType,
+      difficulty: dto.difficulty as ProjectDifficulty | undefined,
+      visibility: dto.visibility as ProjectVisibility | undefined,
+      confidential: dto.confidential ?? false,
+    };
+
     const [project] = await this.db.db
       .insert(projects)
-      .values({
-        ...dto,
-        clientId: client.id,
-        createdBy: userId,
-        status: 'draft',
-        approvalStatus: 'pending',
-        isPublished: false,
-        category: dto.category as ProjectCategory,
-      })
+      .values(insertData)
       .returning();
 
     await this.notificationService.push({
@@ -265,6 +321,204 @@ export class ProjectsService {
   }
 
   /**
+   * Student project feed (cursor-based, foundational)
+   */
+  /**
+   * Student project feed (cursor-based, foundational)
+   */
+  async studentProjectFeed(
+    studentId: string,
+    filters: ProjectFeedFilterInput = {},
+    pagination: CursorPaginationInput = {},
+  ): Promise<StudentProjectFeedResponse> {
+    const userId = this.contextService.getUserId();
+    if (!userId) {
+      throw new AppError(
+        ERROR_CODES.UNAUTHORIZED,
+        'User must be authenticated',
+      );
+    }
+
+    const conditions = [
+      eq(projects.isPublished, true),
+      eq(projects.approvalStatus, 'approved' as ProjectApprovalStatus),
+    ];
+
+    if (filters.search) {
+      conditions.push(
+        or(
+          ilike(projects.title, `%${filters.search}%`),
+          ilike(projects.organization ?? projects.title, `%${filters.search}%`),
+          ilike(projects.description, `%${filters.search}%`),
+        )!,
+      );
+    }
+
+    if (filters.categories?.length) {
+      conditions.push(sql`${projects.category} = ANY(${filters.categories})`);
+    }
+
+    if (filters.skills?.length) {
+      conditions.push(
+        sql`${projects.requiredSkills}::jsonb @> ${JSON.stringify(filters.skills)}::jsonb`,
+      );
+    }
+
+    const limit = pagination.limit ?? 9;
+    const limitPlusOne = limit + 1;
+    if (pagination.cursor) {
+      const cursorDate = new Date(pagination.cursor);
+      if (!Number.isNaN(cursorDate.getTime())) {
+        conditions.push(lt(projects.createdAt, cursorDate));
+      }
+    }
+
+    let orderByClause;
+    switch (filters.sort) {
+      case 'DEADLINE_SOON':
+        conditions.push(sql`${projects.deadline} IS NOT NULL`);
+        orderByClause = asc(projects.deadline);
+        break;
+      case 'OLDEST_FIRST':
+        orderByClause = asc(projects.createdAt);
+        break;
+      case 'NEWEST_FIRST':
+      case 'MATCH_SCORE':
+      default:
+        orderByClause = desc(projects.createdAt);
+        break;
+    }
+
+    const whereClause = and(...conditions)!;
+
+    const rows = await this.db.db
+      .select()
+      .from(projects)
+      .where(whereClause)
+      .orderBy(orderByClause)
+      .limit(limitPlusOne);
+
+    const hasNextPage = rows.length > limit;
+    const sliced = hasNextPage ? rows.slice(0, limit) : rows;
+    const endCursor =
+      sliced.length > 0
+        ? sliced[sliced.length - 1].createdAt?.toISOString()
+        : undefined;
+
+    const cards = sliced.map((p) => this.mapProjectToCard(p));
+    const filtersMeta = await this.buildFiltersMeta(whereClause);
+
+    const pageInfo: ProjectPageInfo = { hasNextPage, endCursor };
+
+    return { cards, filtersMeta, pageInfo };
+  }
+  async studentProjectFeedSearch(
+    studentId: string,
+    term: string,
+  ): Promise<StudentProjectFeedSearchResult> {
+    const userId = this.contextService.getUserId();
+    if (!userId) {
+      throw new AppError(
+        ERROR_CODES.UNAUTHORIZED,
+        'User must be authenticated',
+      );
+    }
+
+    const whereClause = and(
+      eq(projects.isPublished, true),
+      eq(projects.approvalStatus, 'approved' as ProjectApprovalStatus),
+      or(
+        ilike(projects.title, `%${term}%`),
+        ilike(projects.organization ?? projects.title, `%${term}%`),
+        ilike(projects.description, `%${term}%`),
+      ),
+    );
+
+    const rows = await this.db.db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(whereClause)
+      .limit(50);
+
+    return { cardIds: rows.map((r) => r.id) };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+  private mapProjectToCard(project: Project): ProjectCardEntity {
+    const summary =
+      project.description?.slice(0, 180)?.trimEnd() +
+      (project.description && project.description.length > 180 ? '…' : '');
+
+    const skills = (project.requiredSkills || []).slice(0, 6);
+    const tags = this.computeTags(project.tags || []);
+    const timeRemaining = this.computeTimeRemaining(project.deadline);
+
+    return {
+      id: project.id,
+      title: project.title,
+      organization: project.organization ?? undefined,
+      organizationLogoUrl: project.organizationLogoUrl ?? undefined,
+      summary,
+      skills,
+      difficulty: project.difficulty ?? undefined,
+      category: project.category,
+      tags,
+      matchScore: undefined,
+      postedAt: project.createdAt,
+      timeRemaining,
+    };
+  }
+
+  private computeTags(tags: string[]): string[] {
+    if (!tags?.length) return [];
+    if (tags.length <= 4) return tags;
+    const visible = tags.slice(0, 3);
+    const remaining = tags.length - 3;
+    return [...visible, `+${remaining}`];
+  }
+
+  private computeTimeRemaining(deadline?: Date | null): string | undefined {
+    if (!deadline) return undefined;
+    const now = new Date();
+    if (deadline <= now) return 'P0D';
+    const diffMs = deadline.getTime() - now.getTime();
+    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return `P${days}D`;
+  }
+
+  private async buildFiltersMeta(
+    whereClause: SQL<unknown>, // Changed from ReturnType<typeof and>
+  ): Promise<ProjectFiltersMetaEntity> {
+    const categoriesRows = await this.db.db
+      .select({ category: projects.category })
+      .from(projects)
+      .where(whereClause)
+      .groupBy(projects.category);
+
+    const skillsRows = await this.db.db
+      .select({ skills: projects.requiredSkills })
+      .from(projects)
+      .where(whereClause)
+      .limit(200);
+
+    const availableCategories = [
+      ...new Set(categoriesRows.map((row) => row.category)),
+    ];
+
+    const availableSkills = [
+      ...new Set(skillsRows.flatMap((row) => row.skills ?? [])),
+    ].slice(0, 100);
+
+    return {
+      availableCategories,
+      availableSkills,
+      defaultSort: 'MATCH_SCORE',
+    };
+  }
+
+  /**
    * Get a single project by ID
    */
   async findOne(id: string) {
@@ -322,7 +576,7 @@ export class ProjectsService {
     }
 
     // Create properly typed update object
-    const { category, status, ...restOfDto } = dto;
+    const { category, status, difficulty, visibility, ...restOfDto } = dto;
     const updateData: Partial<typeof projects.$inferInsert> = {
       ...restOfDto,
       updatedAt: new Date(),
@@ -334,6 +588,12 @@ export class ProjectsService {
     }
     if (status) {
       updateData.status = status as ProjectStatus;
+    }
+    if (difficulty) {
+      updateData.difficulty = difficulty as ProjectDifficulty;
+    }
+    if (visibility) {
+      updateData.visibility = visibility as ProjectVisibility;
     }
 
     const [updated] = await this.db.db

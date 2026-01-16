@@ -17,8 +17,37 @@ import {
   MinLength,
   MaxLength,
   IsDate,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+@InputType()
+export class ProjectContactInput {
+  @Field()
+  @IsString()
+  name: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  role?: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  email?: string;
+}
+
+@InputType()
+export class ProjectLearnerRequirementInput {
+  @Field()
+  @IsString()
+  label: string;
+
+  @Field()
+  @IsString()
+  level: string;
+}
 
 @InputType()
 export class CreateProjectDto {
@@ -34,6 +63,16 @@ export class CreateProjectDto {
   @IsNotEmpty()
   @MinLength(50, { message: 'Description must be at least 50 characters' })
   description: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  organization?: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  organizationLogoUrl?: string;
 
   @Field({ nullable: true })
   @IsString()
@@ -59,6 +98,36 @@ export class CreateProjectDto {
   @IsString()
   @IsOptional()
   experienceLevel?: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  @IsEnum(['ROOKIE', 'INTERMEDIATE', 'ADVANCED'])
+  difficulty?: string;
+
+  @Field(() => [ProjectLearnerRequirementInput], { nullable: true })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ProjectLearnerRequirementInput)
+  learnerRequirements?: ProjectLearnerRequirementInput[];
+
+  @Field(() => [String], { nullable: true })
+  @IsArray()
+  @IsOptional()
+  expectedOutcomes?: string[];
+
+  @Field(() => [String], { nullable: true })
+  @IsArray()
+  @IsOptional()
+  additionalResources?: string[];
+
+  @Field(() => [ProjectContactInput], { nullable: true })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ProjectContactInput)
+  contactPersons?: ProjectContactInput[];
 
   @Field(() => Int)
   @IsInt()
@@ -145,4 +214,15 @@ export class CreateProjectDto {
   @IsString()
   @IsOptional()
   compensationType?: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  @IsEnum(['PUBLIC', 'UNIVERSITY_RESTRICTED'])
+  visibility?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsBoolean()
+  confidential?: boolean;
 }

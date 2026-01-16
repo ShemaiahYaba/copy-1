@@ -23,6 +23,12 @@ export class ProjectEntity {
   description: string;
 
   @Field({ nullable: true })
+  organization?: string;
+
+  @Field({ nullable: true })
+  organizationLogoUrl?: string;
+
+  @Field({ nullable: true })
   objectives?: string;
 
   @Field({ nullable: true })
@@ -36,6 +42,21 @@ export class ProjectEntity {
 
   @Field({ nullable: true })
   experienceLevel?: string;
+
+  @Field({ nullable: true })
+  difficulty?: string;
+
+  @Field(() => [ProjectLearnerRequirementEntity], { nullable: true })
+  learnerRequirements?: ProjectLearnerRequirementEntity[];
+
+  @Field(() => [String], { nullable: true })
+  expectedOutcomes?: string[];
+
+  @Field(() => [String], { nullable: true })
+  additionalResources?: string[];
+
+  @Field(() => [ProjectContactEntity], { nullable: true })
+  contactPersons?: ProjectContactEntity[];
 
   @Field(() => Int)
   duration: number;
@@ -97,6 +118,12 @@ export class ProjectEntity {
   @Field({ nullable: true })
   compensationType?: string;
 
+  @Field({ nullable: true })
+  visibility?: string;
+
+  @Field({ nullable: true })
+  confidential?: boolean;
+
   @Field(() => Int)
   viewCount: number;
 
@@ -144,4 +171,151 @@ export class PaginatedProjectsResponse {
 
   @Field()
   hasPreviousPage: boolean;
+}
+
+@ObjectType()
+export class ProjectLearnerRequirementEntity {
+  @Field()
+  label: string;
+
+  @Field()
+  level: string;
+}
+
+@ObjectType()
+export class ProjectPageInfo {
+  @Field()
+  hasNextPage: boolean;
+
+  @Field({ nullable: true })
+  endCursor?: string;
+}
+
+@ObjectType()
+export class ProjectFiltersMetaEntity {
+  @Field(() => [String])
+  availableCategories: string[];
+
+  @Field(() => [String])
+  availableSkills: string[];
+
+  @Field()
+  defaultSort: string;
+}
+
+@ObjectType()
+export class ProjectCardEntity {
+  @Field(() => ID)
+  id: string;
+
+  @Field()
+  title: string;
+
+  @Field({ nullable: true })
+  organization?: string;
+
+  @Field({ nullable: true })
+  organizationLogoUrl?: string;
+
+  @Field()
+  summary: string;
+
+  @Field(() => [String])
+  skills: string[];
+
+  @Field({ nullable: true })
+  difficulty?: string;
+
+  @Field()
+  category: string;
+
+  @Field(() => [String])
+  tags: string[];
+
+  @Field({ nullable: true })
+  matchScore?: number;
+
+  @Field()
+  postedAt: Date;
+
+  @Field({ nullable: true })
+  timeRemaining?: string;
+}
+
+@ObjectType()
+export class ProjectContactEntity {
+  @Field()
+  name: string;
+
+  @Field({ nullable: true })
+  role?: string;
+
+  @Field({ nullable: true })
+  email?: string;
+}
+
+@ObjectType()
+export class ProjectCompanyEntity {
+  @Field({ nullable: true })
+  name?: string;
+
+  @Field({ nullable: true })
+  location?: string;
+
+  @Field({ nullable: true })
+  overview?: string;
+}
+
+@ObjectType()
+export class ProjectDetailEntity {
+  @Field(() => ID)
+  id: string;
+
+  @Field()
+  title: string;
+
+  @Field({ nullable: true })
+  organization?: string;
+
+  @Field({ nullable: true })
+  overview?: string;
+
+  @Field(() => [ProjectLearnerRequirementEntity], { nullable: true })
+  learners?: ProjectLearnerRequirementEntity[];
+
+  @Field(() => [String], { nullable: true })
+  outcomes?: string[];
+
+  @Field(() => [String], { nullable: true })
+  deliverables?: string[];
+
+  @Field(() => [String], { nullable: true })
+  resources?: string[];
+
+  @Field(() => [ProjectContactEntity], { nullable: true })
+  contacts?: ProjectContactEntity[];
+
+  @Field(() => ProjectCompanyEntity, { nullable: true })
+  company?: ProjectCompanyEntity;
+
+  @Field(() => [ProjectCardEntity], { nullable: true })
+  recommended?: ProjectCardEntity[];
+}
+
+@ObjectType()
+export class StudentProjectFeedResponse {
+  @Field(() => [ProjectCardEntity])
+  cards: ProjectCardEntity[];
+
+  @Field(() => ProjectFiltersMetaEntity)
+  filtersMeta: ProjectFiltersMetaEntity;
+
+  @Field(() => ProjectPageInfo)
+  pageInfo: ProjectPageInfo;
+}
+
+@ObjectType()
+export class StudentProjectFeedSearchResult {
+  @Field(() => [ID])
+  cardIds: string[];
 }

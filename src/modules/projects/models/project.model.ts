@@ -47,6 +47,17 @@ export const projectCategoryEnum = pgEnum('project_category', [
   'other',
 ]);
 
+export const projectDifficultyEnum = pgEnum('project_difficulty', [
+  'ROOKIE',
+  'INTERMEDIATE',
+  'ADVANCED',
+]);
+
+export const projectVisibilityEnum = pgEnum('project_visibility', [
+  'PUBLIC',
+  'UNIVERSITY_RESTRICTED',
+]);
+
 // ============================================================================
 // PROJECTS TABLE
 // ============================================================================
@@ -67,6 +78,9 @@ export const projects = pgTable(
     // Basic Information
     title: varchar('title', { length: 255 }).notNull(),
     description: text('description').notNull(),
+    organization: varchar('organization', { length: 255 }),
+    organizationLogoUrl: varchar('organization_logo_url', { length: 500 }),
+    difficulty: projectDifficultyEnum('difficulty').default('ROOKIE'),
     objectives: text('objectives'), // What the project aims to achieve
     deliverables: text('deliverables'), // Expected outputs
 
@@ -74,6 +88,15 @@ export const projects = pgTable(
     requiredSkills: json('required_skills').$type<string[]>().notNull(), // ["JavaScript", "React", "Node.js"]
     preferredSkills: json('preferred_skills').$type<string[]>(), // Nice-to-have skills
     experienceLevel: varchar('experience_level', { length: 50 }), // "Beginner", "Intermediate", "Advanced"
+    learnerRequirements: json('learner_requirements').$type<
+      { label: string; level: string }[]
+    >(),
+    expectedOutcomes: json('expected_outcomes').$type<string[]>(),
+    additionalResources: json('additional_resources').$type<string[]>(),
+    contactPersons:
+      json('contact_persons').$type<
+        { name: string; role?: string; email?: string }[]
+      >(),
 
     // Timeline
     duration: integer('duration').notNull(), // Duration in weeks
@@ -108,6 +131,8 @@ export const projects = pgTable(
     location: varchar('location', { length: 255 }), // If not remote
     budget: integer('budget'), // Optional budget in local currency
     compensationType: varchar('compensation_type', { length: 50 }), // "Paid", "Unpaid", "Academic Credit"
+    visibility: projectVisibilityEnum('visibility').default('PUBLIC'),
+    confidential: boolean('confidential').default(false),
 
     // Metadata
     viewCount: integer('view_count').default(0),
@@ -157,3 +182,5 @@ export type ProjectCategory =
   | 'research'
   | 'consulting'
   | 'other';
+export type ProjectDifficulty = 'ROOKIE' | 'INTERMEDIATE' | 'ADVANCED';
+export type ProjectVisibility = 'PUBLIC' | 'UNIVERSITY_RESTRICTED';
