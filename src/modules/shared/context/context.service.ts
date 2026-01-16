@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // ----------------------------------------------------------------------------
 // 6. CONTEXT SERVICE - context.service.ts
 // ----------------------------------------------------------------------------
@@ -104,6 +105,39 @@ export class ContextService {
    */
   getCorrelationId(): string {
     return this.get<string>('correlationId') || 'no-correlation-id';
+  }
+
+  /**
+   * Get common context fields for business logic
+   * @returns Context data snapshot
+   */
+  getContext(): {
+    userId?: string;
+    email?: string;
+    role?: string;
+    studentId?: string;
+    supervisorId?: string;
+    organizationId?: string;
+    universityId?: string;
+    correlationId: string;
+    path?: string;
+    method?: string;
+    timestamp?: Date;
+  } {
+    return {
+      userId: this.get<string>('userId'),
+      email: this.get<string>('email'),
+      role: this.get<string>('role'),
+      studentId: this.get<string>('studentId'),
+      supervisorId: this.get<string>('supervisorId'),
+      organizationId:
+        this.get<string>('organizationId') ?? this.get<string>('orgId'),
+      universityId: this.get<string>('universityId'),
+      correlationId: this.getCorrelationId(),
+      path: this.get<string>('path'),
+      method: this.get<string>('method'),
+      timestamp: this.get<Date>('timestamp'),
+    };
   }
 
   /**

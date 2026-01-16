@@ -15,7 +15,7 @@ import {
   index,
   json,
 } from 'drizzle-orm/pg-core';
-import { users, clients } from '@modules/core/auth/models/user.model';
+import { users, clients, universities } from '@modules/core/auth/models/user.model';
 
 // ============================================================================
 // ENUMS
@@ -70,6 +70,9 @@ export const projects = pgTable(
     // Ownership
     clientId: uuid('client_id')
       .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
+    universityId: uuid('university_id')
+      .references(() => universities.id, { onDelete: 'cascade' })
       .notNull(),
     createdBy: uuid('created_by')
       .references(() => users.id)
@@ -148,6 +151,7 @@ export const projects = pgTable(
   },
   (table) => ({
     clientIdx: index('projects_client_idx').on(table.clientId),
+    universityIdx: index('projects_university_idx').on(table.universityId),
     statusIdx: index('projects_status_idx').on(table.status),
     categoryIdx: index('projects_category_idx').on(table.category),
     publishedIdx: index('projects_published_idx').on(table.isPublished),

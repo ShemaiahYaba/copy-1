@@ -23,6 +23,7 @@ export const ERROR_CODES = {
   TOKEN_EXPIRED: 'ERR_3002',
   INSUFFICIENT_PERMISSIONS: 'ERR_3003',
   INVALID_CREDENTIALS: 'ERR_3004',
+  MISSING_CONTEXT: 'ERR_3005',
 
   // Resource Errors (4000-4999)
   NOT_FOUND: 'ERR_4000',
@@ -62,6 +63,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ERROR_CODES.TOKEN_EXPIRED]: 'Authentication token has expired',
   [ERROR_CODES.INSUFFICIENT_PERMISSIONS]: 'Insufficient permissions',
   [ERROR_CODES.INVALID_CREDENTIALS]: 'Invalid credentials',
+  [ERROR_CODES.MISSING_CONTEXT]: 'Required context is missing',
 
   [ERROR_CODES.NOT_FOUND]: 'Resource not found',
   [ERROR_CODES.RESOURCE_NOT_FOUND]: 'Requested resource not found',

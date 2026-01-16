@@ -14,8 +14,8 @@ export {
   graduationStatusEnum,
 } from '@modules/core/auth/models/user.model';
 
-export { bookmarks } from '@modules/bookmarks/models/bookmark.model';
-export { projects } from '@modules/projects/models/project.model';
+export { bookmarks } from '@modules/core/bookmarks/models/bookmark.model';
+export { projects } from '@modules/core/projects/models/project.model';
 
 // Export types for use elsewhere
 export type {
@@ -37,7 +37,7 @@ export type {
 export type {
   Bookmark,
   NewBookmark,
-} from '@modules/bookmarks/models/bookmark.model';
+} from '@modules/core/bookmarks/models/bookmark.model';
 
 export type {
   Project,
@@ -45,4 +45,4 @@ export type {
   ProjectStatus,
   ProjectApprovalStatus,
   ProjectCategory,
-} from '@modules/projects/models/project.model';
+} from '@modules/core/projects/models/project.model';

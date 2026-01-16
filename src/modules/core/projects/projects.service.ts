@@ -82,6 +82,13 @@ export class ProjectsService {
         'User must be authenticated',
       );
     }
+    const { universityId } = this.contextService.getContext();
+    if (!universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
+      );
+    }
 
     // Get client profile for this user
     const [client] = await this.db.db
@@ -99,6 +106,7 @@ export class ProjectsService {
 
     const insertData: NewProject = {
       clientId: client.id,
+      universityId,
       createdBy: userId,
       title: dto.title,
       description: dto.description,
@@ -145,6 +153,35 @@ export class ProjectsService {
         'Project created successfully! It will be reviewed before publishing.',
       context: { projectId: project.id },
     });
+
+    return project;
+  }
+
+  /**
+   * Find project by ID with tenant validation.
+   * Does NOT increment view count (use findOne for that).
+   */
+  async findById(id: string): Promise<Project> {
+    const { universityId } = this.contextService.getContext();
+    if (!universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
+      );
+    }
+
+    const [project] = await this.db.db
+      .select()
+      .from(projects)
+      .where(and(eq(projects.id, id), eq(projects.universityId, universityId)))
+      .limit(1);
+
+    if (!project) {
+      throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'Project not found', {
+        projectId: id,
+        universityId,
+      });
+    }
 
     return project;
   }

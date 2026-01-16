@@ -5,7 +5,7 @@
 import { relations } from 'drizzle-orm';
 import { bookmarks } from '../models/bookmark.model';
 import { users } from '@modules/core/auth/models/user.model';
-import { projects } from '@modules/projects/models/project.model';
+import { projects } from '@modules/core/projects/models/project.model';
 
 export const bookmarkRelations = relations(bookmarks, ({ one }) => ({
   // Student who owns this bookmark

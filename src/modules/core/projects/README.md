@@ -1,6 +1,6 @@
 # Projects Module
 
-Production-grade projects management for NestJS using Drizzle ORM + GraphQL. Includes client project publishing, student discovery feed, and shared integrations with Auth, Context, Notification, and Error modules.
+Production-grade projects management for NestJS using Drizzle ORM + GraphQL. Includes client project publishing, student discovery feed, and shared integrations with Auth, Context, Notification, and Error modules. All reads/writes are tenant-aware via `universityId`.
 
 ## 📋 Table of Contents
 
@@ -56,6 +56,7 @@ Dependencies:
 Table: `projects`
 
 - Ownership: `clientId`, `createdBy`
+- Tenant: `universityId`
 - Basics: `title`, `description`, `organization`, `organizationLogoUrl`
 - Skills: `requiredSkills[]`, `preferredSkills[]`, `experienceLevel`
 - Difficulty: `difficulty` (`ROOKIE|INTERMEDIATE|ADVANCED`)
@@ -171,6 +172,7 @@ Pagination:
 
 - All mutations require `JwtAuthGuard` + `RolesGuard` with role checks (client for authoring; supervisor/university approval TBD).
 - Student feed/search guarded by Jwt + Roles(student); service also checks context user.
+- Tenant isolation: every query uses `universityId` from `ContextService`.
 - Errors thrown via `AppError` with `ERROR_CODES` (e.g., UNAUTHORIZED, INSUFFICIENT_PERMISSIONS, RESOURCE_NOT_FOUND, OPERATION_NOT_ALLOWED).
 
 ---
@@ -182,7 +184,7 @@ Pagination:
 1. Add module import:
 
 ```typescript
-import { ProjectsModule } from '@modules/projects/projects.module';
+import { ProjectsModule } from '@modules/core/projects/projects.module';
 @Module({
   imports: [DatabaseModule, ContextModule, NotificationModule, ProjectsModule],
 })

@@ -10,6 +10,13 @@ export interface ContextMeta {
   // Organization/Tenant
   orgId?: string;
   orgName?: string;
+  organizationId?: string;
+  universityId?: string;
+
+  // Role-specific identifiers
+  role?: string;
+  studentId?: string;
+  supervisorId?: string;
 
   // Request tracking
   correlationId: string; // Required - always generated

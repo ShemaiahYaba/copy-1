@@ -22,7 +22,7 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": "./src",
     "paths": {
-      "@modules/core/*": ["modules/core/*"],
+      "@core/*": ["modules/core/*"],
       "@modules/shared/*": ["modules/shared/*"],
       "@shared/*": ["modules/shared/*"],
       "@modules/*": ["modules/*"],

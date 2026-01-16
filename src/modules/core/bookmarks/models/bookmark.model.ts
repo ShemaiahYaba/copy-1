@@ -4,8 +4,8 @@
 // ============================================================================
 
 import { pgTable, uuid, timestamp, index, unique } from 'drizzle-orm/pg-core';
-import { users } from '@modules/core/auth/models/user.model';
-import { projects } from '@modules/projects/models/project.model';
+import { users, universities } from '@modules/core/auth/models/user.model';
+import { projects } from '@modules/core/projects/models/project.model';
 
 // ============================================================================
 // BOOKMARKS TABLE
@@ -19,6 +19,10 @@ export const bookmarks = pgTable(
     // Student who saved the bookmark
     studentId: uuid('student_id')
       .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+
+    universityId: uuid('university_id')
+      .references(() => universities.id, { onDelete: 'cascade' })
       .notNull(),
 
     // Project being bookmarked
@@ -38,6 +42,7 @@ export const bookmarks = pgTable(
   (table) => ({
     // Indexes for performance
     studentIdx: index('bookmarks_student_idx').on(table.studentId),
+    universityIdx: index('bookmarks_university_idx').on(table.universityId),
     projectIdx: index('bookmarks_project_idx').on(table.projectId),
     sharedByIdx: index('bookmarks_shared_by_idx').on(table.sharedBy),
     createdAtIdx: index('bookmarks_created_at_idx').on(table.createdAt),

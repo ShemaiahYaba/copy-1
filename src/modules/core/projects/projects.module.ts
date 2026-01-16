@@ -29,7 +29,7 @@ export {
   projectStatusEnum,
   projectApprovalStatusEnum,
   projectCategoryEnum,
-} from '@modules/projects/models/project.model';
+} from '@core/projects/models/project.model';
 
 export type {
   Project,
@@ -37,4 +37,4 @@ export type {
   ProjectStatus,
   ProjectApprovalStatus,
   ProjectCategory,
-} from '@modules/projects/models/project.model';
+} from '@core/projects/models/project.model';

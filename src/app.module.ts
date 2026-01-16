@@ -14,7 +14,7 @@ import { ErrorNotificationStrategy } from './modules/shared/error/dto/error-conf
 import { NotificationAdapter } from '@modules/shared/notification/dto';
 import { AuthModule } from '@modules/core/auth/auth.module';
 import { ProjectsModule } from './modules/projects/projects.module';
-import { BookmarksModule } from '@modules/bookmarks/bookmarks.module';
+import { BookmarksModule } from '@modules/core/bookmarks/bookmarks.module';
 
 import * as dotenv from 'dotenv';
 

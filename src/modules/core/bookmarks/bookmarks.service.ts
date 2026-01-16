@@ -6,8 +6,9 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '@database/database.service';
 import { bookmarks } from './models/bookmark.model';
-import { projects } from '@modules/projects/models/project.model';
+import { projects } from '@modules/core/projects/models/project.model';
 import { users } from '@modules/core/auth/models/user.model';
+import { ProjectsService } from '@modules/core/projects/projects.service';
 import {
   eq,
   and,
@@ -38,13 +39,14 @@ export class BookmarksService {
     private readonly db: DatabaseService,
     private readonly contextService: ContextService,
     private readonly notificationService: NotificationService,
+    private readonly projectsService: ProjectsService,
   ) {}
 
   /**
    * Create a new bookmark (save project)
    */
   async create(dto: CreateBookmarkDto) {
-    const studentId = this.contextService.getUserId();
+    const { studentId, universityId } = this.contextService.getContext();
     if (!studentId) {
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
@@ -52,18 +54,15 @@ export class BookmarksService {
       );
     }
 
-    // Check if project exists
-    const [project] = await this.db.db
-      .select()
-      .from(projects)
-      .where(eq(projects.id, dto.projectId))
-      .limit(1);
-
-    if (!project) {
-      throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'Project not found', {
-        projectId: dto.projectId,
-      });
+    if (!universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
+      );
     }
+
+    // Check if project exists (tenant-validated)
+    await this.projectsService.findById(dto.projectId);
 
     // Check if bookmark already exists
     const [existing] = await this.db.db
@@ -72,6 +71,7 @@ export class BookmarksService {
       .where(
         and(
           eq(bookmarks.studentId, studentId),
+          eq(bookmarks.universityId, universityId),
           eq(bookmarks.projectId, dto.projectId),
         ),
       )
@@ -89,7 +89,12 @@ export class BookmarksService {
     const [countResult] = await this.db.db
       .select({ count: count() })
       .from(bookmarks)
-      .where(eq(bookmarks.studentId, studentId));
+      .where(
+        and(
+          eq(bookmarks.studentId, studentId),
+          eq(bookmarks.universityId, universityId),
+        ),
+      );
 
     const currentCount = countResult?.count || 0;
 
@@ -106,6 +111,7 @@ export class BookmarksService {
       .insert(bookmarks)
       .values({
         studentId,
+        universityId,
         projectId: dto.projectId,
         sharedBy: dto.sharedBy || null,
       })
@@ -142,11 +148,17 @@ export class BookmarksService {
     hasNextPage: boolean;
     hasPreviousPage: boolean;
   }> {
-    const studentId = this.contextService.getUserId();
+    const { studentId, universityId } = this.contextService.getContext();
     if (!studentId) {
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
         'User must be authenticated',
+      );
+    }
+    if (!universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
       );
     }
 
@@ -162,7 +174,10 @@ export class BookmarksService {
     const offset = (page - 1) * limit;
 
     // Build WHERE conditions
-    const conditions = [eq(bookmarks.studentId, studentId)];
+    const conditions = [
+      eq(bookmarks.studentId, studentId),
+      eq(bookmarks.universityId, universityId),
+    ];
 
     // Apply filter type
     switch (filter) {
@@ -309,18 +324,26 @@ export class BookmarksService {
    * Get a single bookmark by ID
    */
   async findOne(id: string) {
-    const studentId = this.contextService.getUserId();
+    const { studentId, universityId } = this.contextService.getContext();
     if (!studentId) {
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
         'User must be authenticated',
       );
     }
+    if (!universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
+      );
+    }
 
     const [bookmark] = await this.db.db
       .select()
       .from(bookmarks)
-      .where(eq(bookmarks.id, id))
+      .where(
+        and(eq(bookmarks.id, id), eq(bookmarks.universityId, universityId)),
+      )
       .limit(1);
 
     if (!bookmark) {
@@ -344,18 +367,26 @@ export class BookmarksService {
    * Delete a single bookmark
    */
   async remove(id: string) {
-    const studentId = this.contextService.getUserId();
+    const { studentId, universityId } = this.contextService.getContext();
     if (!studentId) {
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
         'User must be authenticated',
       );
     }
+    if (!universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
+      );
+    }
 
     const [bookmark] = await this.db.db
       .select()
       .from(bookmarks)
-      .where(eq(bookmarks.id, id))
+      .where(
+        and(eq(bookmarks.id, id), eq(bookmarks.universityId, universityId)),
+      )
       .limit(1);
 
     if (!bookmark) {
@@ -383,7 +414,11 @@ export class BookmarksService {
       });
     }
 
-    await this.db.db.delete(bookmarks).where(eq(bookmarks.id, id));
+    await this.db.db
+      .delete(bookmarks)
+      .where(
+        and(eq(bookmarks.id, id), eq(bookmarks.universityId, universityId)),
+      );
 
     await this.notificationService.push({
       type: NotificationType.INFO,
@@ -398,11 +433,17 @@ export class BookmarksService {
    * Delete a bookmark by projectId (alternative deletion method)
    */
   async removeByProjectId(projectId: string) {
-    const studentId = this.contextService.getUserId();
+    const { studentId, universityId } = this.contextService.getContext();
     if (!studentId) {
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
         'User must be authenticated',
+      );
+    }
+    if (!universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
       );
     }
 
@@ -413,6 +454,7 @@ export class BookmarksService {
         and(
           eq(bookmarks.studentId, studentId),
           eq(bookmarks.projectId, projectId),
+          eq(bookmarks.universityId, universityId),
         ),
       )
       .limit(1);
@@ -423,7 +465,14 @@ export class BookmarksService {
       });
     }
 
-    await this.db.db.delete(bookmarks).where(eq(bookmarks.id, bookmark.id));
+    await this.db.db
+      .delete(bookmarks)
+      .where(
+        and(
+          eq(bookmarks.id, bookmark.id),
+          eq(bookmarks.universityId, universityId),
+        ),
+      );
 
     await this.notificationService.push({
       type: NotificationType.INFO,
@@ -438,11 +487,17 @@ export class BookmarksService {
    * Bulk delete bookmarks
    */
   async bulkDelete(dto: BulkDeleteBookmarksDto) {
-    const studentId = this.contextService.getUserId();
+    const { studentId, universityId } = this.contextService.getContext();
     if (!studentId) {
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
         'User must be authenticated',
+      );
+    }
+    if (!universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
       );
     }
 
@@ -453,6 +508,7 @@ export class BookmarksService {
       .where(
         and(
           eq(bookmarks.studentId, studentId),
+          eq(bookmarks.universityId, universityId),
           inArray(bookmarks.id, dto.bookmarkIds),
         ),
       );
@@ -470,6 +526,7 @@ export class BookmarksService {
       .where(
         and(
           eq(bookmarks.studentId, studentId),
+          eq(bookmarks.universityId, universityId),
           inArray(bookmarks.id, dto.bookmarkIds),
         ),
       );
@@ -491,11 +548,17 @@ export class BookmarksService {
    * Search bookmarks by term (returns bookmark IDs for client-side filtering)
    */
   async search(term: string): Promise<{ bookmarkIds: string[] }> {
-    const studentId = this.contextService.getUserId();
+    const { studentId, universityId } = this.contextService.getContext();
     if (!studentId) {
       throw new AppError(
         ERROR_CODES.UNAUTHORIZED,
         'User must be authenticated',
+      );
+    }
+    if (!universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
       );
     }
 
@@ -506,6 +569,7 @@ export class BookmarksService {
       .where(
         and(
           eq(bookmarks.studentId, studentId),
+          eq(bookmarks.universityId, universityId),
           or(
             ilike(projects.title, `%${term}%`),
             ilike(projects.description, `%${term}%`),
@@ -522,15 +586,20 @@ export class BookmarksService {
    * Get bookmark count for a student
    */
   async getCount(): Promise<number> {
-    const studentId = this.contextService.getUserId();
-    if (!studentId) {
+    const { studentId, universityId } = this.contextService.getContext();
+    if (!studentId || !universityId) {
       return 0;
     }
 
     const [result] = await this.db.db
       .select({ count: count() })
       .from(bookmarks)
-      .where(eq(bookmarks.studentId, studentId));
+      .where(
+        and(
+          eq(bookmarks.studentId, studentId),
+          eq(bookmarks.universityId, universityId),
+        ),
+      );
 
     return result?.count || 0;
   }
