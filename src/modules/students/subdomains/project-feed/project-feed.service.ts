@@ -14,7 +14,7 @@ import {
   ProjectFeedFiltersDto,
   ProjectFeedSortOption,
 } from './dto/project-feed-filters.dto';
-import type { ProjectCardEntity } from './entities/project-card.entity';
+import type { StudentProjectCardEntity } from './entities/project-card.entity';
 
 const MAX_BOOKMARK_SCAN = 1000;
 
@@ -84,27 +84,30 @@ export class ProjectFeedService {
 
     const bookmarkedProjectIds = await this.getBookmarkedProjectIds();
 
-    const cards: ProjectCardEntity[] = filteredProjects.map((project) => {
-      const isBookmarked = bookmarkedProjectIds.has(project.id);
+    const cards: StudentProjectCardEntity[] = filteredProjects.map(
+      (project) => {
+        const isBookmarked = bookmarkedProjectIds.has(project.id);
 
-      return {
-        id: project.id,
-        title: project.title,
-        organization: project.organization || 'Unknown Organization',
-        organizationLogoUrl: project.organizationLogoUrl ?? undefined,
-        summary: this.createSummary(project.description ?? undefined),
-        skills: project.requiredSkills || [],
-        difficulty: project.difficulty || this.mapDifficulty(project.category),
-        category: project.category || 'other',
-        postedAt: project.createdAt.toISOString(),
-        matchScore: this.calculateMatchScore(project, studentId),
-        timeRemaining: this.calculateTimeRemaining(
-          project.deadline ?? undefined,
-        ),
-        tags: this.generateTags(project, isBookmarked),
-        status: project.status,
-      };
-    });
+        return {
+          id: project.id,
+          title: project.title,
+          organization: project.organization || 'Unknown Organization',
+          organizationLogoUrl: project.organizationLogoUrl ?? undefined,
+          summary: this.createSummary(project.description ?? undefined),
+          skills: project.requiredSkills || [],
+          difficulty:
+            project.difficulty || this.mapDifficulty(project.category),
+          category: project.category || 'other',
+          postedAt: project.createdAt.toISOString(),
+          matchScore: this.calculateMatchScore(project, studentId),
+          timeRemaining: this.calculateTimeRemaining(
+            project.deadline ?? undefined,
+          ),
+          tags: this.generateTags(project, isBookmarked),
+          status: project.status,
+        };
+      },
+    );
 
     if (filters.sort === 'MATCH_SCORE') {
       cards.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
@@ -124,7 +127,7 @@ export class ProjectFeedService {
       cards.length > 0 ? cards[cards.length - 1].postedAt : undefined;
 
     return {
-      cards,
+      cards: cards ?? [],
       filtersMeta: {
         availableCategories,
         availableSkills,
@@ -134,7 +137,7 @@ export class ProjectFeedService {
         hasNextPage: projectsResult.hasNextPage,
         endCursor,
       },
-      total: projectsResult.total,
+      total: projectsResult.total ?? 0,
     };
   }
 

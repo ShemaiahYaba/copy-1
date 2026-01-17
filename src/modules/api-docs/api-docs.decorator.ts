@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // src/common/decorators/api-docs.decorator.ts
 
 import { applyDecorators, Type } from '@nestjs/common';

@@ -1,0 +1,599 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type ProjectEntity {
+  id: ID!
+  clientId: ID!
+  createdBy: ID!
+  title: String!
+  description: String!
+  organization: String
+  organizationLogoUrl: String
+  objectives: String
+  deliverables: String
+  requiredSkills: [String!]!
+  preferredSkills: [String!]
+  experienceLevel: String
+  difficulty: String
+  learnerRequirements: [ProjectLearnerRequirementEntity!]
+  expectedOutcomes: [String!]
+  additionalResources: [String!]
+  contactPersons: [ProjectContactEntity!]
+  duration: Int!
+  startDate: DateTime
+  deadline: DateTime
+  isFlexibleTimeline: Boolean!
+  teamSize: Int!
+  maxApplicants: Int
+  status: String!
+  approvalStatus: String!
+  approvedBy: ID
+  approvedAt: DateTime
+  category: String!
+  tags: [String!]
+  industry: String
+  assignedTeamId: ID
+  assignedAt: DateTime
+  isPublished: Boolean!
+  isRemote: Boolean!
+  location: String
+  budget: Int
+  compensationType: String
+  visibility: String
+  confidential: Boolean
+  viewCount: Int!
+  applicationCount: Int!
+  bookmarkCount: Int!
+  publishedAt: DateTime
+  completedAt: DateTime
+  cancelledAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type PaginatedProjectsResponse {
+  items: [ProjectEntity!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+type ProjectLearnerRequirementEntity {
+  label: String!
+  level: String!
+}
+
+type ProjectPageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type ProjectFiltersMetaEntity {
+  availableCategories: [String!]!
+  availableSkills: [String!]!
+  defaultSort: String!
+}
+
+type ProjectCardEntity {
+  id: ID!
+  title: String!
+  organization: String
+  organizationLogoUrl: String
+  summary: String!
+  skills: [String!]!
+  difficulty: String
+  category: String!
+  tags: [String!]!
+  matchScore: Float
+  postedAt: DateTime!
+  timeRemaining: String
+}
+
+type ProjectContactEntity {
+  name: String!
+  role: String
+  email: String
+}
+
+type ProjectCompanyEntity {
+  name: String
+  location: String
+  overview: String
+}
+
+type StudentProjectFeedResponse {
+  cards: [ProjectCardEntity!]!
+  filtersMeta: ProjectFiltersMetaEntity!
+  pageInfo: ProjectPageInfo!
+}
+
+type StudentProjectFeedSearchResult {
+  cardIds: [ID!]!
+}
+
+type ExperienceLearnerRequirementEntity {
+  label: String!
+  value: String!
+}
+
+type ExperienceCompanyPreferencesEntity {
+  location: String
+  industry: [String!]
+}
+
+type ExperienceContactEntity {
+  name: String!
+  role: String!
+  email: String!
+  institution: String!
+  location: String!
+}
+
+type ExperienceEntity {
+  id: ID!
+  createdBy: ID!
+  universityId: ID!
+  title: String!
+  courseCode: String
+  overview: String!
+  startDate: DateTime!
+  endDate: DateTime!
+  durationWeeks: Int
+  learnerRequirements: [ExperienceLearnerRequirementEntity!]
+  companyPreferences: ExperienceCompanyPreferencesEntity
+  prerequisites: [String!]
+  expectedOutcomes: [String!]
+  projectExamples: [String!]
+  mainContact: ExperienceContactEntity
+  status: String!
+  tags: [String!]
+  totalStudents: Int!
+  matchesCount: Int!
+  publishedAt: DateTime
+  archivedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type PaginatedExperiencesResponse {
+  items: [ExperienceEntity!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+type TeamMemberEntity {
+  id: ID!
+  userId: ID!
+  role: String!
+  status: String!
+  canInviteMembers: Boolean!
+  canEditTeam: Boolean!
+  canMessageClient: Boolean!
+  joinedAt: DateTime!
+  leftAt: DateTime
+}
+
+type TeamEntity {
+  id: ID!
+  createdBy: ID!
+  universityId: ID!
+  name: String!
+  description: String
+  avatar: String
+  projectId: ID
+  assignedAt: DateTime
+  supervisorId: ID
+  leadId: ID
+  status: String!
+  visibility: String!
+  maxMembers: Int!
+  currentMemberCount: Int!
+  hasUnreadMessages: Boolean!
+  lastMessageAt: DateTime
+  tags: [String!]
+  skills: [String!]
+  completedAt: DateTime
+  disbandedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type PaginatedTeamsResponse {
+  items: [TeamEntity!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+type TeamAssignmentEntity {
+  id: ID!
+  teamId: ID!
+  userId: ID!
+  role: String!
+  status: String!
+  canInviteMembers: Boolean!
+  canEditTeam: Boolean!
+  canMessageClient: Boolean!
+  joinedAt: DateTime!
+  leftAt: DateTime
+  createdAt: DateTime!
+}
+
+type StudentContext {
+  studentId: String
+  universityId: String
+  role: String
+}
+
+type StudentProjectCardEntity {
+  id: ID!
+  title: String!
+  organization: String!
+  organizationLogoUrl: String
+  summary: String!
+  skills: [String!]!
+  difficulty: String!
+  category: String!
+  postedAt: String!
+  matchScore: Float
+  timeRemaining: String
+  tags: [String!]!
+  status: String!
+}
+
+type ProjectFeedFiltersMeta {
+  availableCategories: [String!]!
+  availableSkills: [String!]!
+  defaultSort: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type ProjectFeedResponse {
+  cards: [StudentProjectCardEntity!]!
+  filtersMeta: ProjectFeedFiltersMeta!
+  pageInfo: PageInfo!
+  total: Int!
+}
+
+type SharedByEntity {
+  id: ID!
+  name: String!
+  email: String
+}
+
+type BookmarkEntity {
+  id: ID!
+  studentId: ID!
+  projectId: ID!
+  sharedBy: SharedByEntity
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type BookmarkCardEntity {
+  id: ID!
+  projectId: ID!
+  title: String!
+  organization: String!
+  organizationLogoUrl: String
+  summary: String!
+  skills: [String!]!
+  difficulty: String!
+  tags: [String!]!
+  postedAt: DateTime!
+  timeRemaining: String
+  status: String!
+  sharedBy: SharedByEntity
+  createdAt: DateTime!
+}
+
+type PaginatedBookmarksResponse {
+  cards: [BookmarkCardEntity!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+type Query {
+  projects(filters: FilterProjectsDto!): PaginatedProjectsResponse!
+  studentProjectFeedCursor(studentId: ID!, filters: ProjectFeedFilterInput, pagination: CursorPaginationInput): StudentProjectFeedResponse!
+  studentProjectFeedSearch(studentId: ID!, term: String!): StudentProjectFeedSearchResult!
+  project(id: ID!): ProjectEntity!
+  myProjects(filters: FilterProjectsDto!): PaginatedProjectsResponse!
+  experiences(filters: FilterExperiencesDto!): PaginatedExperiencesResponse!
+  experience(id: ID!): ExperienceEntity!
+  teams(filters: FilterTeamsDto!): PaginatedTeamsResponse!
+  team(id: ID!): TeamEntity!
+  studentContext: StudentContext!
+  studentProjectFeed(filters: ProjectFeedFiltersDto): ProjectFeedResponse!
+  searchProjectFeed(term: String!): [ID!]!
+  studentBookmarks(filters: FilterBookmarksDto!): PaginatedBookmarksResponse!
+  studentBookmark(id: ID!): BookmarkEntity!
+  searchBookmarks(term: String!): [ID!]!
+  studentBookmarkCount: Float!
+}
+
+input FilterProjectsDto {
+  page: Int = 1
+  limit: Int = 10
+  search: String
+  status: String
+  approvalStatus: String
+  category: String
+  requiredSkills: [String!]
+  tags: [String!]
+  industry: String
+  isRemote: Boolean
+  isPublished: Boolean
+  isAvailable: Boolean
+  sortBy: String = "createdAt"
+  sortOrder: String = "desc"
+}
+
+input ProjectFeedFilterInput {
+  search: String
+  categories: [String!]
+  skills: [String!]
+  sort: String = "MATCH_SCORE"
+}
+
+input CursorPaginationInput {
+  cursor: String
+  limit: Int = 9
+}
+
+input FilterExperiencesDto {
+  page: Int = 1
+  limit: Int = 10
+  search: String
+  status: String
+  sortBy: String = "createdAt"
+  sortOrder: String = "desc"
+}
+
+input FilterTeamsDto {
+  page: Int = 1
+  limit: Int = 10
+  search: String
+  status: String
+  projectId: ID
+  supervisorId: ID
+  sortBy: String = "createdAt"
+  sortOrder: String = "desc"
+}
+
+input ProjectFeedFiltersDto {
+  page: Int = 1
+  limit: Int = 9
+  search: String
+  categories: [String!]
+  sort: String = "MATCH_SCORE"
+  cursor: String
+}
+
+input FilterBookmarksDto {
+  page: Int = 1
+  limit: Int = 9
+  filter: String = "ALL"
+  search: String
+  sortBy: String = "createdAt"
+  sortOrder: String = "desc"
+}
+
+type Mutation {
+  createProject(input: CreateProjectDto!): ProjectEntity!
+  updateProject(id: ID!, input: UpdateProjectDto!): ProjectEntity!
+  deleteProject(id: ID!): ProjectEntity!
+  publishProject(id: ID!): ProjectEntity!
+  approveProject(id: ID!): ProjectEntity!
+  assignProjectToTeam(projectId: ID!, teamId: ID!): ProjectEntity!
+  createExperience(input: CreateExperienceDto!): ExperienceEntity!
+  updateExperience(id: ID!, input: UpdateExperienceDto!): ExperienceEntity!
+  publishExperience(id: ID!): ExperienceEntity!
+  archiveExperience(id: ID!): ExperienceEntity!
+  deleteExperience(id: ID!): ExperienceEntity!
+  createTeam(input: CreateTeamDto!): TeamEntity!
+  updateTeam(id: ID!, input: UpdateTeamDto!): TeamEntity!
+  addTeamMember(teamId: ID!, input: AddMemberDto!): TeamAssignmentEntity!
+  expressProjectInterest(projectId: ID!): Boolean!
+  bookmarkProject(projectId: ID!): Boolean!
+  createBookmark(input: CreateBookmarkDto!): BookmarkEntity!
+  removeBookmark(id: ID!): Boolean!
+  removeBookmarkByProject(projectId: ID!): Boolean!
+  bulkDeleteBookmarks(input: BulkDeleteBookmarksDto!): Boolean!
+}
+
+input CreateProjectDto {
+  title: String!
+  description: String!
+  organization: String
+  organizationLogoUrl: String
+  objectives: String
+  deliverables: String
+  requiredSkills: [String!]!
+  preferredSkills: [String!]
+  experienceLevel: String
+  difficulty: String
+  learnerRequirements: [ProjectLearnerRequirementInput!]
+  expectedOutcomes: [String!]
+  additionalResources: [String!]
+  contactPersons: [ProjectContactInput!]
+  duration: Int!
+  startDate: DateTime
+  deadline: DateTime
+  isFlexibleTimeline: Boolean
+  teamSize: Int
+  maxApplicants: Int
+  category: String!
+  tags: [String!]
+  industry: String
+  isRemote: Boolean
+  location: String
+  budget: Int
+  compensationType: String
+  visibility: String
+  confidential: Boolean
+}
+
+input ProjectLearnerRequirementInput {
+  label: String!
+  level: String!
+}
+
+input ProjectContactInput {
+  name: String!
+  role: String
+  email: String
+}
+
+input UpdateProjectDto {
+  title: String
+  description: String
+  organization: String
+  organizationLogoUrl: String
+  objectives: String
+  deliverables: String
+  requiredSkills: [String!]
+  preferredSkills: [String!]
+  experienceLevel: String
+  difficulty: String
+  learnerRequirements: [ProjectLearnerRequirementInput!]
+  expectedOutcomes: [String!]
+  additionalResources: [String!]
+  contactPersons: [ProjectContactInput!]
+  duration: Int
+  startDate: DateTime
+  deadline: DateTime
+  isFlexibleTimeline: Boolean
+  teamSize: Int
+  maxApplicants: Int
+  category: String
+  tags: [String!]
+  industry: String
+  isRemote: Boolean
+  location: String
+  budget: Int
+  compensationType: String
+  visibility: String
+  confidential: Boolean
+  status: String
+  assignedTeamId: String
+}
+
+input CreateExperienceDto {
+  title: String!
+  courseCode: String
+  overview: String!
+  startDate: DateTime!
+  endDate: DateTime!
+  durationWeeks: Int
+  learnerRequirements: [ExperienceLearnerRequirementInput!]
+  companyPreferences: ExperienceCompanyPreferencesInput
+  prerequisites: [String!]
+  expectedOutcomes: [String!]
+  projectExamples: [String!]
+  mainContact: ExperienceContactInput
+  tags: [String!]
+}
+
+input ExperienceLearnerRequirementInput {
+  label: String!
+  value: String!
+}
+
+input ExperienceCompanyPreferencesInput {
+  location: String
+  industry: [String!]
+}
+
+input ExperienceContactInput {
+  name: String!
+  role: String!
+  email: String!
+  institution: String!
+  location: String!
+}
+
+input UpdateExperienceDto {
+  title: String
+  courseCode: String
+  overview: String
+  startDate: DateTime
+  endDate: DateTime
+  durationWeeks: Int
+  learnerRequirements: [ExperienceLearnerRequirementInput!]
+  companyPreferences: ExperienceCompanyPreferencesInput
+  prerequisites: [String!]
+  expectedOutcomes: [String!]
+  projectExamples: [String!]
+  mainContact: ExperienceContactInput
+  tags: [String!]
+  status: String
+}
+
+input CreateTeamDto {
+  name: String!
+  description: String
+  avatar: String
+  projectId: ID
+  supervisorId: ID
+  leadId: ID
+  visibility: String = "UNIVERSITY_ONLY"
+  maxMembers: Int = 10
+  tags: [String!]
+  skills: [String!]
+}
+
+input UpdateTeamDto {
+  name: String
+  description: String
+  avatar: String
+  projectId: ID
+  supervisorId: ID
+  leadId: ID
+  visibility: String
+  maxMembers: Int = 10
+  tags: [String!]
+  skills: [String!]
+  status: String
+}
+
+input AddMemberDto {
+  userId: ID!
+  role: String = "MEMBER"
+  canInviteMembers: Boolean = false
+  canEditTeam: Boolean = false
+  canMessageClient: Boolean = false
+}
+
+input CreateBookmarkDto {
+  projectId: ID!
+  sharedBy: ID
+}
+
+input BulkDeleteBookmarksDto {
+  bookmarkIds: [ID!]!
+}

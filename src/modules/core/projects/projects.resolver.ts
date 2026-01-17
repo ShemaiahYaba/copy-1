@@ -42,7 +42,7 @@ export class ProjectsResolver {
     return this.projectsService.findAll(filters);
   }
 
-  @Query(() => StudentProjectFeedResponse, { name: 'studentProjectFeed' })
+  @Query(() => StudentProjectFeedResponse, { name: 'studentProjectFeedCursor' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('student')
   async studentProjectFeed(

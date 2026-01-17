@@ -15,7 +15,14 @@ export {
 } from '@modules/core/auth/models/user.model';
 
 export { bookmarks } from '@modules/students/subdomains/bookmarks/models/bookmark.model';
-export { projects } from '@modules/core/projects/models/project.model';
+export {
+  projects,
+  projectStatusEnum,
+  projectApprovalStatusEnum,
+  projectCategoryEnum,
+  projectDifficultyEnum,
+  projectVisibilityEnum,
+} from '@modules/core/projects/models/project.model';
 export {
   experiences,
   experienceStatusEnum,

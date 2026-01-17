@@ -6,7 +6,7 @@
 import { ObjectType, Field, ID, Float, Int } from '@nestjs/graphql';
 
 @ObjectType()
-export class ProjectCardEntity {
+export class StudentProjectCardEntity {
   @Field(() => ID)
   id: string;
 
@@ -70,8 +70,8 @@ export class PageInfo {
 
 @ObjectType()
 export class ProjectFeedResponse {
-  @Field(() => [ProjectCardEntity])
-  cards: ProjectCardEntity[];
+  @Field(() => [StudentProjectCardEntity])
+  cards: StudentProjectCardEntity[];
 
   @Field(() => ProjectFeedFiltersMeta)
   filtersMeta: ProjectFeedFiltersMeta;

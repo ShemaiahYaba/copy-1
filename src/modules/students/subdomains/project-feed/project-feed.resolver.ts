@@ -3,7 +3,15 @@
 // src/modules/students/subdomains/project-feed/project-feed.resolver.ts
 // ============================================================================
 
-import { Resolver, Query, Mutation, Args, ID } from '@nestjs/graphql';
+import {
+  Resolver,
+  Query,
+  Mutation,
+  Args,
+  ID,
+  ResolveField,
+  Parent,
+} from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard, RolesGuard } from '@modules/core/auth/guards';
 import { Roles, CurrentUser } from '@modules/core/auth/decorators';
@@ -12,7 +20,7 @@ import { ProjectFeedService } from './project-feed.service';
 import { ProjectFeedResponse } from './entities/project-card.entity';
 import { ProjectFeedFiltersDto } from './dto/project-feed-filters.dto';
 
-@Resolver()
+@Resolver(() => ProjectFeedResponse)
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ProjectFeedResolver {
   constructor(private readonly projectFeedService: ProjectFeedService) {}
@@ -23,7 +31,22 @@ export class ProjectFeedResolver {
     @Args('filters', { nullable: true }) filters: ProjectFeedFiltersDto,
     @CurrentUser() _user: User, // eslint-disable-line @typescript-eslint/no-unused-vars
   ) {
-    return this.projectFeedService.getProjectFeed(filters || {});
+    const result = await this.projectFeedService.getProjectFeed(filters || {});
+    return {
+      cards: result?.cards ?? [],
+      filtersMeta: result?.filtersMeta ?? {
+        availableCategories: [],
+        availableSkills: [],
+        defaultSort: 'MATCH_SCORE',
+      },
+      pageInfo: result?.pageInfo ?? { hasNextPage: false, endCursor: undefined },
+      total: result?.total ?? 0,
+    };
+  }
+
+  @ResolveField()
+  cards(@Parent() parent: ProjectFeedResponse) {
+    return parent?.cards ?? [];
   }
 
   @Query(() => [ID], { name: 'searchProjectFeed' })

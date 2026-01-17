@@ -60,13 +60,16 @@ export class AppErrorFilter implements common.ExceptionFilter {
    */
   @SentryExceptionCaptured()
   catch(rawException: unknown, host: common.ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const res = ctx.getResponse<Response>();
-    const req = ctx.getRequest<Request>();
+    const isHttp = host.getType() === 'http';
+    const ctx = isHttp ? host.switchToHttp() : undefined;
+    const res = ctx?.getResponse<Response>();
+    const req = ctx?.getRequest<Request>();
 
     // Handle BadRequestException (validation errors) specially
     if (rawException instanceof common.BadRequestException) {
-      return this.handleValidationError(rawException, req, res);
+      if (req && res) {
+        return this.handleValidationError(rawException, req, res);
+      }
     }
 
     // Use ErrorService.processError to transform the error
@@ -108,13 +111,16 @@ export class AppErrorFilter implements common.ExceptionFilter {
     };
 
     // Add correlationId if present
-    const response = this.enrichResponse(
-      responseToSend as ProcessedErrorResponse,
-      req,
-    );
+    const response = req
+      ? this.enrichResponse(responseToSend as ProcessedErrorResponse, req)
+      : (responseToSend as ProcessedErrorResponse);
 
     // Send final response
-    return res.status(statusCode).json(response);
+    if (res) {
+      return res.status(statusCode).json(response);
+    }
+
+    return response;
   }
 
   // --------------------------------------------------------------------------
@@ -163,8 +169,12 @@ export class AppErrorFilter implements common.ExceptionFilter {
   // --------------------------------------------------------------------------
   private enrichResponse(
     errorResponse: ProcessedErrorResponse,
-    req: Request,
+    req?: Request,
   ): ProcessedErrorResponse & { correlationId?: string } {
+    if (!req) {
+      return errorResponse;
+    }
+
     const typedReq = req as RequestWithCorrelationId;
 
     if (typedReq.correlationId) {
