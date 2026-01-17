@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // ============================================================================
 // FIX 1: src/instrument.ts - Remove invalid 'tracing' option
 // ============================================================================

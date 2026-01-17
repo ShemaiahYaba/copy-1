@@ -1,7 +1,7 @@
 import { InputType, PartialType, Field } from '@nestjs/graphql';
 import { CreateTeamDto } from './create-team.dto';
 import { IsOptional, IsEnum } from 'class-validator';
-import { TeamStatus, TeamVisibility } from '../models/team.model';
+import type { TeamStatus, TeamVisibility } from '../models/team.model';
 
 @InputType()
 export class UpdateTeamDto extends PartialType(CreateTeamDto) {

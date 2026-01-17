@@ -8,7 +8,7 @@ import {
   Max,
   IsUUID,
 } from 'class-validator';
-import { TeamStatus } from '../models/team.model';
+import type { TeamStatus } from '../models/team.model';
 
 @InputType()
 export class FilterTeamsDto {

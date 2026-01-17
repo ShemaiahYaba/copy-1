@@ -244,6 +244,7 @@ export class AppErrorFilter implements common.ExceptionFilter {
       ERR_3002: 401,
       ERR_3003: 403,
       ERR_3004: 401,
+      ERR_3005: 400,
 
       // Resource
       ERR_4000: 404,

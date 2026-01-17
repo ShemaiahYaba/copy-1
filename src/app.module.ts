@@ -5,6 +5,11 @@
 
 import { Module } from '@nestjs/common';
 import { SentryModule } from '@sentry/nestjs/setup';
+import { GraphQLModule } from '@nestjs/graphql';
+import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
+import { join } from 'path';
+import { EnvironmentConfig } from './config/environment';
+import { Request } from 'express';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
@@ -26,6 +31,20 @@ dotenv.config();
   imports: [
     // 1. Sentry Module (setup must come early)
     SentryModule.forRoot(),
+
+    GraphQLModule.forRoot<ApolloDriverConfig>({
+      driver: ApolloDriver,
+      path: '/graphql',
+
+      autoSchemaFile: join(process.cwd(), 'schema.gql'),
+
+      // ✅ dev-only UI, always allow introspection in dev
+      playground: EnvironmentConfig.getNodeEnv() !== 'production',
+      introspection: EnvironmentConfig.getNodeEnv() !== 'production',
+
+      // allow guards/auth later
+      context: (ctx: { req: Request }) => ({ req: ctx.req }),
+    }),
 
     // 2. Notification Module (ErrorModule depends on it)
     NotificationModule.register({

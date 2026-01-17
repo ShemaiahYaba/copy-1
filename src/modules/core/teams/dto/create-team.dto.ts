@@ -17,7 +17,7 @@ import {
   IsEnum,
   IsUUID,
 } from 'class-validator';
-import { TeamVisibility } from '../models/team.model';
+import type { TeamVisibility } from '../models/team.model';
 
 @InputType()
 export class CreateTeamDto {

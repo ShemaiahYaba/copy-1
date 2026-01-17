@@ -6,7 +6,7 @@ import {
   IsOptional,
   IsBoolean,
 } from 'class-validator';
-import { TeamRole } from '../models/team-assignment.model';
+import type { TeamRole } from '../models/team-assignment.model';
 
 @InputType()
 export class AddMemberDto {
