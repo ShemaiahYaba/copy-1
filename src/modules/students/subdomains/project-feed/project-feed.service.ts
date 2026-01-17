@@ -5,11 +5,11 @@
 
 import { Injectable } from '@nestjs/common';
 import { ProjectsService } from '@modules/core/projects/projects.service';
-import { BookmarksService } from '@modules/core/bookmarks/bookmarks.service';
+import { StudentBookmarksService } from '@modules/students/subdomains/bookmarks/bookmarks.service';
 import { ContextService } from '@modules/shared/context/context.service';
 import { AppError } from '@shared/error/classes/app-error.class';
 import { ERROR_CODES } from '@shared/error/constants/error-codes.constant';
-import type { FilterBookmarksDto } from '@modules/core/bookmarks/dto/filter-bookmarks.dto';
+import type { FilterBookmarksDto } from '@modules/students/subdomains/bookmarks/dto/filter-bookmarks.dto';
 import {
   ProjectFeedFiltersDto,
   ProjectFeedSortOption,
@@ -37,7 +37,7 @@ type ProjectLike = {
 export class ProjectFeedService {
   constructor(
     private readonly projectsService: ProjectsService,
-    private readonly bookmarksService: BookmarksService,
+    private readonly bookmarksService: StudentBookmarksService,
     private readonly contextService: ContextService,
   ) {}
 

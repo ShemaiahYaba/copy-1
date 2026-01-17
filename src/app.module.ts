@@ -14,7 +14,6 @@ import { ErrorNotificationStrategy } from './modules/shared/error/dto/error-conf
 import { NotificationAdapter } from '@modules/shared/notification/dto';
 import { AuthModule } from '@modules/core/auth/auth.module';
 import { ProjectsModule } from '@core/projects/projects.module';
-import { BookmarksModule } from '@core/bookmarks/bookmarks.module';
 import { ExperiencesModule } from '@core/experiences/experiences.module';
 import { TeamsModule } from '@core/teams/teams.module';
 import { StudentsModule } from '@modules/students/students.module';
@@ -49,7 +48,6 @@ dotenv.config();
     DatabaseModule,
     AuthModule,
     ProjectsModule,
-    BookmarksModule,
     ExperiencesModule,
     TeamsModule,
     StudentsModule,

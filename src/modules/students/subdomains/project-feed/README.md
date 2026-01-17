@@ -7,7 +7,7 @@ Student-specific project discovery and browsing.
 - Provides student view of available projects
 - Filters projects by eligibility
 - Enriches with match scores and bookmarking status
-- Orchestrates ProjectsService and BookmarksService
+- Orchestrates ProjectsService and StudentBookmarksService
 
 ## Responsibilities
 
@@ -22,7 +22,7 @@ Student-specific project discovery and browsing.
 // DOMAIN service injects CORE services
 constructor(
   private readonly projectsService: ProjectsService, // Core
-  private readonly bookmarksService: BookmarksService, // Core
+  private readonly bookmarksService: StudentBookmarksService, // Student domain
 ) {}
 
 async getProjectFeed() {

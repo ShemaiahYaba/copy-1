@@ -9,14 +9,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProjectFeedService } from '../project-feed.service';
 import { ProjectsService } from '@modules/core/projects/projects.service';
-import { BookmarksService } from '@modules/core/bookmarks/bookmarks.service';
+import { StudentBookmarksService } from '@modules/students/subdomains/bookmarks/bookmarks.service';
 import { ContextService } from '@modules/shared/context/context.service';
 import { AppError } from '@shared/error/classes/app-error.class';
 
 describe('ProjectFeedService', () => {
   let service: ProjectFeedService;
   let mockProjects: jest.Mocked<ProjectsService>;
-  let mockBookmarks: jest.Mocked<BookmarksService>;
+  let mockBookmarks: jest.Mocked<StudentBookmarksService>;
   let mockContext: jest.Mocked<ContextService>;
 
   const mockStudentId = 'student-123';
@@ -45,7 +45,7 @@ describe('ProjectFeedService', () => {
       providers: [
         ProjectFeedService,
         { provide: ProjectsService, useValue: mockProjects },
-        { provide: BookmarksService, useValue: mockBookmarks },
+        { provide: StudentBookmarksService, useValue: mockBookmarks },
         { provide: ContextService, useValue: mockContext },
       ],
     }).compile();

@@ -14,7 +14,7 @@ export {
   graduationStatusEnum,
 } from '@modules/core/auth/models/user.model';
 
-export { bookmarks } from '@modules/core/bookmarks/models/bookmark.model';
+export { bookmarks } from '@modules/students/subdomains/bookmarks/models/bookmark.model';
 export { projects } from '@modules/core/projects/models/project.model';
 export {
   experiences,
@@ -52,7 +52,7 @@ export type {
 export type {
   Bookmark,
   NewBookmark,
-} from '@modules/core/bookmarks/models/bookmark.model';
+} from '@modules/students/subdomains/bookmarks/models/bookmark.model';
 
 export type {
   Project,
