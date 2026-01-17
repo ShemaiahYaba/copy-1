@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/unbound-method */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // src/modules/core/auth/__tests__/auth.service.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from '../auth.service';

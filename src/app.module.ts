@@ -17,6 +17,7 @@ import { ProjectsModule } from '@core/projects/projects.module';
 import { BookmarksModule } from '@core/bookmarks/bookmarks.module';
 import { ExperiencesModule } from '@core/experiences/experiences.module';
 import { TeamsModule } from '@core/teams/teams.module';
+import { StudentsModule } from '@modules/students/students.module';
 
 import * as dotenv from 'dotenv';
 
@@ -51,6 +52,7 @@ dotenv.config();
     BookmarksModule,
     ExperiencesModule,
     TeamsModule,
+    StudentsModule,
 
     // 4. Your other modules
   ],
