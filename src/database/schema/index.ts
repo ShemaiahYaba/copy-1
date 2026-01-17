@@ -16,6 +16,21 @@ export {
 
 export { bookmarks } from '@modules/core/bookmarks/models/bookmark.model';
 export { projects } from '@modules/core/projects/models/project.model';
+export {
+  experiences,
+  experienceStatusEnum,
+} from '@modules/core/experiences/models/experience.model';
+export { experienceParticipants } from '@modules/core/experiences/models/experience-participant.model';
+export {
+  teams,
+  teamStatusEnum,
+  teamVisibilityEnum,
+} from '@modules/core/teams/models/team.model';
+export {
+  teamAssignments,
+  teamRoleEnum,
+  assignmentStatusEnum,
+} from '@modules/core/teams/models/team-assignment.model';
 
 // Export types for use elsewhere
 export type {
@@ -46,3 +61,25 @@ export type {
   ProjectApprovalStatus,
   ProjectCategory,
 } from '@modules/core/projects/models/project.model';
+
+export type {
+  Experience,
+  NewExperience,
+  ExperienceStatus,
+} from '@modules/core/experiences/models/experience.model';
+export type {
+  ExperienceParticipant,
+  NewExperienceParticipant,
+} from '@modules/core/experiences/models/experience-participant.model';
+export type {
+  Team,
+  NewTeam,
+  TeamStatus,
+  TeamVisibility,
+} from '@modules/core/teams/models/team.model';
+export type {
+  TeamAssignment,
+  NewTeamAssignment,
+  TeamRole,
+  AssignmentStatus,
+} from '@modules/core/teams/models/team-assignment.model';

@@ -13,8 +13,10 @@ import { NotificationModule } from './modules/shared/notification/notification.m
 import { ErrorNotificationStrategy } from './modules/shared/error/dto/error-config.dto';
 import { NotificationAdapter } from '@modules/shared/notification/dto';
 import { AuthModule } from '@modules/core/auth/auth.module';
-import { ProjectsModule } from './modules/projects/projects.module';
-import { BookmarksModule } from '@modules/core/bookmarks/bookmarks.module';
+import { ProjectsModule } from '@core/projects/projects.module';
+import { BookmarksModule } from '@core/bookmarks/bookmarks.module';
+import { ExperiencesModule } from '@core/experiences/experiences.module';
+import { TeamsModule } from '@core/teams/teams.module';
 
 import * as dotenv from 'dotenv';
 
@@ -47,6 +49,8 @@ dotenv.config();
     AuthModule,
     ProjectsModule,
     BookmarksModule,
+    ExperiencesModule,
+    TeamsModule,
 
     // 4. Your other modules
   ],

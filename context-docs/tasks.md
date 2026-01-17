@@ -1,562 +1,1124 @@
-# 10 Explicit Next Tasks (Execution Order)
+# TASK 12: CREATE TEAMS CORE MODULE (Complete Implementation)
 
-## Task 1: Add universityId to bookmarks table schema
+## **Duration:** 2-3 hours
 
-**File:** `src/modules/bookmarks/models/bookmark.model.ts`
-
-**Action:**
-
-```typescript
-// FIND this line (around line 18):
-studentId: uuid('student_id')
-  .references(() => users.id, { onDelete: 'cascade' })
-  .notNull(),
-
-// ADD this immediately after:
-universityId: uuid('university_id')
-  .references(() => universities.id, { onDelete: 'cascade' })
-  .notNull(),
-
-// UPDATE the indexes section at bottom (around line 39):
-// ADD this new index:
-universityIdx: index('bookmarks_university_idx').on(table.universityId),
-```
-
-**Verify:** File should now have `universityId` field and index.
+### **Dependencies:** None (can start after Task 11)
 
 ---
 
-## Task 2: Generate and run migration for bookmarks table
+## **Step 12.1: Generate NestJS Module Scaffolding**
 
 **Terminal commands (run in order):**
 
 ```bash
-# Step 1: Generate migration
-pnpm drizzle-kit generate
+# Navigate to project root
+cd /path/to/gradlinq-backend
 
-# Step 2: Review the generated SQL file
-# It should be in src/database/migrations/
-# Look for ALTER TABLE bookmarks ADD COLUMN university_id
+# Generate module
+nest g module modules/teams
 
-# Step 3: Run migration
-pnpm drizzle-kit migrate
+# Generate service
+nest g service modules/teams --no-spec
 
-# Step 4: Verify migration applied
-# Check your database that bookmarks table now has university_id column
+# Generate resolver
+nest g resolver modules/teams --no-spec
+
+# Create required folders
+mkdir -p src/modules/teams/models
+mkdir -p src/modules/teams/entities
+mkdir -p src/modules/teams/dto
+mkdir -p src/modules/teams/interfaces
+
+# Create required files
+touch src/modules/teams/models/team.model.ts
+touch src/modules/teams/models/team-assignment.model.ts
+touch src/modules/teams/entities/team.entity.ts
+touch src/modules/teams/dto/create-team.dto.ts
+touch src/modules/teams/dto/update-team.dto.ts
+touch src/modules/teams/dto/filter-teams.dto.ts
+touch src/modules/teams/dto/add-member.dto.ts
+touch src/modules/teams/README.md
 ```
 
-**Verify:** Run `SELECT * FROM bookmarks LIMIT 1;` in your DB - should see `university_id` column.
+**Verify:** You should now have this structure:
+
+```markdown
+src/modules/teams/
+├── teams.module.ts
+├── teams.service.ts
+├── teams.resolver.ts
+├── models/
+│ ├── team.model.ts
+│ └── team-assignment.model.ts
+├── entities/
+│ └── team.entity.ts
+├── dto/
+│ ├── create-team.dto.ts
+│ ├── update-team.dto.ts
+│ ├── filter-teams.dto.ts
+│ └── add-member.dto.ts
+└── README.md
+```
 
 ---
 
-## Task 3: Update ContextService.getContext() to include universityId
+## **Step 12.2: Define Database Models**
 
-**File:** `src/modules/shared/context/context.service.ts`
+### **File 1:** `src/modules/teams/models/team.model.ts`
 
-**Action:** Find the `getContext()` method and verify it returns an object that includes `universityId`. If it doesn't, add it:
-
-```typescript
-// FIND the getContext method (should look like this):
-getContext(): ContextData {
-  return {
-    userId: this.get('userId'),
-    email: this.get('email'),
-    role: this.get('role'),
-    studentId: this.get('studentId'),
-    supervisorId: this.get('supervisorId'),
-    organizationId: this.get('organizationId'),
-    universityId: this.get('universityId'), // ← ENSURE this line exists
-    correlationId: this.get('correlationId'),
-    path: this.get('path'),
-    method: this.get('method'),
-    timestamp: this.get('timestamp'),
-  };
-}
-```
-
-**Verify:** TypeScript should not show errors. If `ContextData` type doesn't include `universityId`, update the interface/type definition too.
-
----
-
-## Task 4: Update BookmarksService.create() to use universityId
-
-**File:** `src/modules/bookmarks/bookmarks.service.ts`
-
-**Action:** Find the `create()` method (around line 40) and modify:
+**Action:** Copy this EXACT code:
 
 ```typescript
-// FIND this line (around line 40):
-async create(dto: CreateBookmarkDto) {
-  const studentId = this.contextService.getUserId();
+// ============================================================================
+// TEAMS TABLE MODEL
+// src/modules/teams/models/team.model.ts
+// ============================================================================
 
-  // REPLACE with:
-  const { studentId, universityId } = this.contextService.getContext();
+import {
+  pgTable,
+  uuid,
+  varchar,
+  text,
+  timestamp,
+  boolean,
+  integer,
+  pgEnum,
+  index,
+  json,
+} from 'drizzle-orm/pg-core';
+import { users } from '@modules/core/auth/models/user.model';
+import { projects } from '@modules/projects/models/project.model';
 
-  if (!studentId) {
-    throw new AppError(
-      ERROR_CODES.UNAUTHORIZED,
-      'User must be authenticated',
-    );
-  }
+// ============================================================================
+// ENUMS
+// ============================================================================
 
-  // ADD this check:
-  if (!universityId) {
-    throw new AppError(
-      ERROR_CODES.MISSING_CONTEXT,
-      'University context required',
-    );
-  }
+export const teamStatusEnum = pgEnum('team_status', [
+  'ACTIVE',
+  'INACTIVE',
+  'COMPLETED',
+  'DISBANDED',
+]);
 
-  // FIND the insert statement (around line 89):
-  const [bookmark] = await this.db.db
-    .insert(bookmarks)
-    .values({
-      studentId,
-      projectId: dto.projectId,
-      sharedBy: dto.sharedBy || null,
-      universityId,  // ← ADD this line
-    })
-    .returning();
-```
+export const teamVisibilityEnum = pgEnum('team_visibility', [
+  'PUBLIC',
+  'PRIVATE',
+  'UNIVERSITY_ONLY',
+]);
 
-**Verify:** Method should now extract both `studentId` and `universityId` from context and insert `universityId` into the database.
+// ============================================================================
+// TEAMS TABLE
+// ============================================================================
 
----
+export const teams = pgTable(
+  'teams',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
 
-## Task 5: Update BookmarksService.findAll() to filter by universityId
+    // Ownership & Context
+    createdBy: uuid('created_by')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    universityId: uuid('university_id')
+      .references(() => users.id, { onDelete: 'cascade' }) // TODO: Change to universities.id when table exists
+      .notNull(),
 
-**File:** `src/modules/bookmarks/bookmarks.service.ts`
+    // Basic Information
+    name: varchar('name', { length: 255 }).notNull(),
+    description: text('description'),
+    avatar: varchar('avatar', { length: 500 }), // Team avatar/logo URL
 
-**Action:** Find the `findAll()` method (around line 120) and modify:
+    // Project Assignment
+    projectId: uuid('project_id').references(() => projects.id, {
+      onDelete: 'set null',
+    }),
+    assignedAt: timestamp('assigned_at'),
 
-```typescript
-// FIND this line (around line 126):
-async findAll(filters: FilterBookmarksDto): Promise<{...}> {
-  const studentId = this.contextService.getUserId();
+    // Supervision
+    supervisorId: uuid('supervisor_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
 
-  // REPLACE with:
-  const { studentId, universityId } = this.contextService.getContext();
+    // Team Lead (usually a student)
+    leadId: uuid('lead_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
 
-  if (!studentId) {
-    throw new AppError(
-      ERROR_CODES.UNAUTHORIZED,
-      'User must be authenticated',
-    );
-  }
+    // Status & Settings
+    status: teamStatusEnum('status').default('ACTIVE').notNull(),
+    visibility: teamVisibilityEnum('visibility')
+      .default('UNIVERSITY_ONLY')
+      .notNull(),
 
-  // ADD this check:
-  if (!universityId) {
-    throw new AppError(
-      ERROR_CODES.MISSING_CONTEXT,
-      'University context required',
-    );
-  }
+    // Capacity
+    maxMembers: integer('max_members').default(10).notNull(),
+    currentMemberCount: integer('current_member_count').default(0).notNull(),
 
-  // FIND the conditions array (around line 145):
-  const conditions = [eq(bookmarks.studentId, studentId)];
+    // Messaging
+    hasUnreadMessages: boolean('has_unread_messages').default(false),
+    lastMessageAt: timestamp('last_message_at'),
 
-  // REPLACE with:
-  const conditions = [
-    eq(bookmarks.studentId, studentId),
-    eq(bookmarks.universityId, universityId),  // ← ADD this line
-  ];
-```
+    // Metadata
+    tags: json('tags').$type<string[]>(),
+    skills: json('skills').$type<string[]>(), // Team's combined skills
 
-**Verify:** All bookmark queries now filter by both `studentId` AND `universityId`.
-
----
-
-## Task 6: Update ALL remaining BookmarksService methods to filter by universityId
-
-**File:** `src/modules/bookmarks/bookmarks.service.ts`
-
-**Action:** Update these methods (in order):
-
-### 6a. Update `findOne()` method (around line 270)
-
-```typescript
-// FIND:
-const studentId = this.contextService.getUserId();
-
-// REPLACE with:
-const { studentId, universityId } = this.contextService.getContext();
-
-// FIND the query:
-const [bookmark] = await this.db.db
-  .select()
-  .from(bookmarks)
-  .where(eq(bookmarks.id, id))
-  .limit(1);
-
-// REPLACE where clause with:
-.where(
-  and(
-    eq(bookmarks.id, id),
-    eq(bookmarks.universityId, universityId)
-  )
-)
-```
-
-### 6b. Update `remove()` method (around line 295)
-
-```typescript
-// FIND:
-const studentId = this.contextService.getUserId();
-
-// REPLACE with:
-const { studentId, universityId } = this.contextService.getContext();
-
-// FIND the query:
-const [bookmark] = await this.db.db
-  .select()
-  .from(bookmarks)
-  .where(eq(bookmarks.id, id))
-  .limit(1);
-
-// REPLACE where clause with:
-.where(
-  and(
-    eq(bookmarks.id, id),
-    eq(bookmarks.universityId, universityId)
-  )
-)
-```
-
-### 6c. Update `removeByProjectId()` method (around line 340)
-
-```typescript
-// FIND:
-const studentId = this.contextService.getUserId();
-
-// REPLACE with:
-const { studentId, universityId } = this.contextService.getContext();
-
-// FIND the query:
-.where(
-  and(
-    eq(bookmarks.studentId, studentId),
-    eq(bookmarks.projectId, projectId),
-  ),
-)
-
-// REPLACE with:
-.where(
-  and(
-    eq(bookmarks.studentId, studentId),
-    eq(bookmarks.projectId, projectId),
-    eq(bookmarks.universityId, universityId),  // ← ADD this line
-  ),
-)
-```
-
-### 6d. Update `bulkDelete()` method (around line 372)
-
-```typescript
-// FIND:
-const studentId = this.contextService.getUserId();
-
-// REPLACE with:
-const { studentId, universityId } = this.contextService.getContext();
-
-// FIND both queries in this method:
-.where(
-  and(
-    eq(bookmarks.studentId, studentId),
-    inArray(bookmarks.id, dto.bookmarkIds),
-  ),
-)
-
-// REPLACE with (do this for BOTH occurrences):
-.where(
-  and(
-    eq(bookmarks.studentId, studentId),
-    eq(bookmarks.universityId, universityId),  // ← ADD this line
-    inArray(bookmarks.id, dto.bookmarkIds),
-  ),
-)
-```
-
-### 6e. Update `search()` method (around line 410)
-
-```typescript
-// FIND:
-const studentId = this.contextService.getUserId();
-
-// REPLACE with:
-const { studentId, universityId } = this.contextService.getContext();
-
-// FIND the query:
-.where(
-  and(
-    eq(bookmarks.studentId, studentId),
-    or(
-      ilike(projects.title, `%${term}%`),
-      ilike(projects.description, `%${term}%`),
-    ),
-  ),
-)
-
-// REPLACE with:
-.where(
-  and(
-    eq(bookmarks.studentId, studentId),
-    eq(bookmarks.universityId, universityId),  // ← ADD this line
-    or(
-      ilike(projects.title, `%${term}%`),
-      ilike(projects.description, `%${term}%`),
-    ),
-  ),
-)
-```
-
-### 6f. Update `getCount()` method (around line 433)
-
-```typescript
-// FIND:
-const studentId = this.contextService.getUserId();
-if (!studentId) {
-  return 0;
-}
-
-// REPLACE with:
-const { studentId, universityId } = this.contextService.getContext();
-if (!studentId || !universityId) {
-  return 0;
-}
-
-// FIND the query:
-.from(bookmarks)
-.where(eq(bookmarks.studentId, studentId));
-
-// REPLACE with:
-.from(bookmarks)
-.where(
-  and(
-    eq(bookmarks.studentId, studentId),
-    eq(bookmarks.universityId, universityId)
-  )
+    // Timestamps
+    completedAt: timestamp('completed_at'),
+    disbandedAt: timestamp('disbanded_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    createdByIdx: index('teams_created_by_idx').on(table.createdBy),
+    universityIdx: index('teams_university_idx').on(table.universityId),
+    projectIdx: index('teams_project_idx').on(table.projectId),
+    supervisorIdx: index('teams_supervisor_idx').on(table.supervisorId),
+    leadIdx: index('teams_lead_idx').on(table.leadId),
+    statusIdx: index('teams_status_idx').on(table.status),
+    createdAtIdx: index('teams_created_at_idx').on(table.createdAt),
+  }),
 );
-```
 
-**Verify:** Search your file for `this.contextService.getUserId()` - should return 0 results. All should use `getContext()` now.
+// ============================================================================
+// TYPE EXPORTS
+// ============================================================================
+
+export type Team = typeof teams.$inferSelect;
+export type NewTeam = typeof teams.$inferInsert;
+export type TeamStatus = 'ACTIVE' | 'INACTIVE' | 'COMPLETED' | 'DISBANDED';
+export type TeamVisibility = 'PUBLIC' | 'PRIVATE' | 'UNIVERSITY_ONLY';
+```
 
 ---
 
-## Task 7: Add findById() method to ProjectsService
+### **File 2:** `src/modules/teams/models/team-assignment.model.ts`
 
-**File:** `src/modules/projects/projects.service.ts`
-
-**Action:** Add this new method AFTER the `create()` method (around line 150):
+**Action:** Copy this code:
 
 ```typescript
-/**
- * Find project by ID with tenant validation.
- * Does NOT increment view count (use findOne for that).
- *
- * @param id - Project ID
- * @returns Project entity
- * @throws AppError if project not found or wrong university
- */
-async findById(id: string): Promise<Project> {
-  const { universityId } = this.contextService.getContext();
+// ============================================================================
+// TEAM ASSIGNMENTS TABLE MODEL
+// src/modules/teams/models/team-assignment.model.ts
+// ============================================================================
 
-  if (!universityId) {
-    throw new AppError(
-      ERROR_CODES.MISSING_CONTEXT,
-      'University context required',
-    );
-  }
+import {
+  pgTable,
+  uuid,
+  varchar,
+  timestamp,
+  boolean,
+  pgEnum,
+  index,
+  unique,
+} from 'drizzle-orm/pg-core';
+import { users } from '@modules/core/auth/models/user.model';
+import { teams } from './team.model';
 
-  const [project] = await this.db.db
-    .select()
-    .from(projects)
-    .where(
-      and(
-        eq(projects.id, id),
-        eq(projects.universityId, universityId)
-      )
-    )
-    .limit(1);
+// ============================================================================
+// ENUMS
+// ============================================================================
 
-  if (!project) {
-    throw new AppError(
-      ERROR_CODES.RESOURCE_NOT_FOUND,
-      'Project not found',
-      { projectId: id, universityId }
-    );
-  }
+export const teamRoleEnum = pgEnum('team_role', ['LEAD', 'MEMBER', 'OBSERVER']);
 
-  return project;
-}
+export const assignmentStatusEnum = pgEnum('assignment_status', [
+  'ACTIVE',
+  'INACTIVE',
+  'REMOVED',
+  'LEFT',
+]);
+
+// ============================================================================
+// TEAM ASSIGNMENTS TABLE (Many-to-Many: Teams <-> Users)
+// ============================================================================
+
+export const teamAssignments = pgTable(
+  'team_assignments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+
+    // Relations
+    teamId: uuid('team_id')
+      .references(() => teams.id, { onDelete: 'cascade' })
+      .notNull(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    universityId: uuid('university_id')
+      .references(() => users.id, { onDelete: 'cascade' }) // TODO: Change to universities.id
+      .notNull(),
+
+    // Role & Status
+    role: teamRoleEnum('role').default('MEMBER').notNull(),
+    status: assignmentStatusEnum('status').default('ACTIVE').notNull(),
+
+    // Permissions
+    canInviteMembers: boolean('can_invite_members').default(false),
+    canEditTeam: boolean('can_edit_team').default(false),
+    canMessageClient: boolean('can_message_client').default(false),
+
+    // Metadata
+    invitedBy: uuid('invited_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    joinedAt: timestamp('joined_at').defaultNow().notNull(),
+    leftAt: timestamp('left_at'),
+    removedBy: uuid('removed_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    removedAt: timestamp('removed_at'),
+    removalReason: varchar('removal_reason', { length: 500 }),
+
+    // Timestamps
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    teamIdx: index('assignments_team_idx').on(table.teamId),
+    userIdx: index('assignments_user_idx').on(table.userId),
+    universityIdx: index('assignments_university_idx').on(table.universityId),
+    statusIdx: index('assignments_status_idx').on(table.status),
+    // Unique constraint: One assignment per user per team
+    uniqueTeamUser: unique('assignments_team_user_unique').on(
+      table.teamId,
+      table.userId,
+    ),
+  }),
+);
+
+// ============================================================================
+// TYPE EXPORTS
+// ============================================================================
+
+export type TeamAssignment = typeof teamAssignments.$inferSelect;
+export type NewTeamAssignment = typeof teamAssignments.$inferInsert;
+export type TeamRole = 'LEAD' | 'MEMBER' | 'OBSERVER';
+export type AssignmentStatus = 'ACTIVE' | 'INACTIVE' | 'REMOVED' | 'LEFT';
 ```
-
-**Verify:** TypeScript compiles. Method signature should match the existing `findOne()` but without view count increment.
 
 ---
 
-## Task 8: Add universityId to projects table (if missing)
+## **Step 12.3: Export Schema in Central Registry**
 
-**File:** `src/modules/projects/models/project.model.ts`
+**File:** `src/database/schema/index.ts`
 
-**Action:** Check if `universityId` exists in the projects table schema (around line 85):
+**Action:** Add these lines at the bottom:
 
 ```typescript
-// SEARCH for this field:
-universityId: uuid('university_id')
+// Add to existing exports
+export {
+  teams,
+  teamAssignments,
+  teamStatusEnum,
+  teamVisibilityEnum,
+  teamRoleEnum,
+  assignmentStatusEnum,
+} from '@modules/teams/models/team.model';
 
-// IF IT DOESN'T EXIST, ADD it after clientId:
-clientId: uuid('client_id')
-  .references(() => clients.id, { onDelete: 'cascade' })
-  .notNull(),
+// Re-export from team-assignment.model.ts
+export { teamAssignments } from '@modules/teams/models/team-assignment.model';
 
-// ADD THIS:
-universityId: uuid('university_id')
-  .references(() => universities.id, { onDelete: 'cascade' })
-  .notNull(),
-
-// ALSO ADD index at bottom if missing:
-universityIdx: index('projects_university_idx').on(table.universityId),
+export type {
+  Team,
+  NewTeam,
+  TeamStatus,
+  TeamVisibility,
+  TeamAssignment,
+  NewTeamAssignment,
+  TeamRole,
+  AssignmentStatus,
+} from '@modules/teams/models/team.model';
 ```
 
-**If you added it:** Run migration:
+**Verify:** Run `pnpm build` - should compile without errors.
+
+---
+
+## **Step 12.4: Generate and Run Migration**
+
+**Terminal commands:**
 
 ```bash
+# Generate migration
 pnpm drizzle-kit generate
+
+# This will create a new file like:
+# src/database/migrations/0003_teams_tables.sql
+
+# Review the generated SQL
+cat src/database/migrations/0003_*.sql
+
+# Expected SQL should include:
+# - CREATE TYPE "team_status" AS ENUM (...)
+# - CREATE TYPE "team_visibility" AS ENUM (...)
+# - CREATE TYPE "team_role" AS ENUM (...)
+# - CREATE TYPE "assignment_status" AS ENUM (...)
+# - CREATE TABLE "teams" (...)
+# - CREATE TABLE "team_assignments" (...)
+# - CREATE INDEX statements
+# - CREATE UNIQUE INDEX for team_user constraint
+
+# Run migration
 pnpm drizzle-kit migrate
 ```
 
-**Verify:** Projects table has `university_id` column in database.
+**Verify:** Check your database:
+
+```sql
+-- Run in your database client
+SELECT * FROM teams LIMIT 1;
+SELECT * FROM team_assignments LIMIT 1;
+```
+
+Both tables should exist (empty).
 
 ---
 
-## Task 9: Update BookmarksService to use ProjectsService.findById()
+## **Step 12.5: Create GraphQL Entities**
 
-**File:** `src/modules/bookmarks/bookmarks.service.ts`
+**File:** `src/modules/teams/entities/team.entity.ts`
 
-**Action:**
-
-### 9a. Add ProjectsService to constructor (around line 50)
+**Action:** Copy this code:
 
 ```typescript
-// FIND the constructor:
-constructor(
-  private readonly db: DatabaseService,
-  private readonly contextService: ContextService,
-  private readonly notificationService: NotificationService,
-) {}
+// ============================================================================
+// GRAPHQL ENTITIES
+// src/modules/teams/entities/team.entity.ts
+// ============================================================================
 
-// REPLACE with:
-constructor(
-  private readonly db: DatabaseService,
-  private readonly contextService: ContextService,
-  private readonly notificationService: NotificationService,
-  private readonly projectsService: ProjectsService,  // ← ADD this line
-) {}
-```
+import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
 
-### 9b. Update imports at top of file
+@ObjectType()
+export class TeamMemberEntity {
+  @Field(() => ID)
+  id: string;
 
-```typescript
-// FIND the imports section (around line 5):
-import { DatabaseService } from '@database/database.service';
+  @Field(() => ID)
+  userId: string;
 
-// ADD this import:
-import { ProjectsService } from '@modules/projects/projects.service';
-```
+  @Field()
+  role: string;
 
-### 9c. Update create() method to use ProjectsService (around line 55)
+  @Field()
+  status: string;
 
-```typescript
-// FIND this code (around line 55):
-// Check if project exists
-const [project] = await this.db.db
-  .select()
-  .from(projects)
-  .where(eq(projects.id, dto.projectId))
-  .limit(1);
+  @Field()
+  canInviteMembers: boolean;
 
-if (!project) {
-  throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'Project not found', {
-    projectId: dto.projectId,
-  });
+  @Field()
+  canEditTeam: boolean;
+
+  @Field()
+  canMessageClient: boolean;
+
+  @Field()
+  joinedAt: Date;
+
+  @Field({ nullable: true })
+  leftAt?: Date;
 }
 
-// REPLACE with:
-// Check if project exists (via ProjectsService - handles tenant validation)
-const project = await this.projectsService.findById(dto.projectId);
-```
+@ObjectType()
+export class TeamEntity {
+  @Field(() => ID)
+  id: string;
 
-**Verify:** Bookmarks service now uses ProjectsService instead of direct database access for project lookups.
+  @Field(() => ID)
+  createdBy: string;
+
+  @Field(() => ID)
+  universityId: string;
+
+  @Field()
+  name: string;
+
+  @Field({ nullable: true })
+  description?: string;
+
+  @Field({ nullable: true })
+  avatar?: string;
+
+  @Field(() => ID, { nullable: true })
+  projectId?: string;
+
+  @Field({ nullable: true })
+  assignedAt?: Date;
+
+  @Field(() => ID, { nullable: true })
+  supervisorId?: string;
+
+  @Field(() => ID, { nullable: true })
+  leadId?: string;
+
+  @Field()
+  status: string;
+
+  @Field()
+  visibility: string;
+
+  @Field(() => Int)
+  maxMembers: number;
+
+  @Field(() => Int)
+  currentMemberCount: number;
+
+  @Field()
+  hasUnreadMessages: boolean;
+
+  @Field({ nullable: true })
+  lastMessageAt?: Date;
+
+  @Field(() => [String], { nullable: true })
+  tags?: string[];
+
+  @Field(() => [String], { nullable: true })
+  skills?: string[];
+
+  @Field({ nullable: true })
+  completedAt?: Date;
+
+  @Field({ nullable: true })
+  disbandedAt?: Date;
+
+  @Field()
+  createdAt: Date;
+
+  @Field()
+  updatedAt: Date;
+}
+
+@ObjectType()
+export class TeamWithMembersEntity extends TeamEntity {
+  @Field(() => [TeamMemberEntity])
+  members: TeamMemberEntity[];
+}
+
+@ObjectType()
+export class PaginatedTeamsResponse {
+  @Field(() => [TeamEntity])
+  items: TeamEntity[];
+
+  @Field(() => Int)
+  total: number;
+
+  @Field(() => Int)
+  page: number;
+
+  @Field(() => Int)
+  limit: number;
+
+  @Field(() => Int)
+  totalPages: number;
+
+  @Field()
+  hasNextPage: boolean;
+
+  @Field()
+  hasPreviousPage: boolean;
+}
+
+@ObjectType()
+export class TeamAssignmentEntity {
+  @Field(() => ID)
+  id: string;
+
+  @Field(() => ID)
+  teamId: string;
+
+  @Field(() => ID)
+  userId: string;
+
+  @Field()
+  role: string;
+
+  @Field()
+  status: string;
+
+  @Field()
+  canInviteMembers: boolean;
+
+  @Field()
+  canEditTeam: boolean;
+
+  @Field()
+  canMessageClient: boolean;
+
+  @Field()
+  joinedAt: Date;
+
+  @Field({ nullable: true })
+  leftAt?: Date;
+
+  @Field()
+  createdAt: Date;
+}
+```
 
 ---
 
-## Task 10: Update BookmarksModule to import ProjectsModule
+## **Step 12.6: Create DTOs**
 
-**File:** `src/modules/bookmarks/bookmarks.module.ts`
-
-**Action:**
-
-### 10a. Add import statement
+### **File 1:** `src/modules/teams/dto/create-team.dto.ts`
 
 ```typescript
-// FIND the imports section (around line 5):
-import { DatabaseModule } from '@database/database.module';
+// ============================================================================
+// CREATE TEAM DTO
+// src/modules/teams/dto/create-team.dto.ts
+// ============================================================================
 
-// ADD this import:
-import { ProjectsModule } from '@modules/projects/projects.module';
+import { InputType, Field, Int, ID } from '@nestjs/graphql';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  IsInt,
+  Min,
+  Max,
+  MinLength,
+  MaxLength,
+  IsEnum,
+  IsUUID,
+} from 'class-validator';
+
+@InputType()
+export class CreateTeamDto {
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3, { message: 'Team name must be at least 3 characters' })
+  @MaxLength(255, { message: 'Team name must not exceed 255 characters' })
+  name: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  @MaxLength(1000)
+  description?: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  avatar?: string;
+
+  @Field(() => ID, { nullable: true })
+  @IsUUID()
+  @IsOptional()
+  projectId?: string;
+
+  @Field(() => ID, { nullable: true })
+  @IsUUID()
+  @IsOptional()
+  supervisorId?: string;
+
+  @Field(() => ID, { nullable: true })
+  @IsUUID()
+  @IsOptional()
+  leadId?: string;
+
+  @Field({ nullable: true, defaultValue: 'UNIVERSITY_ONLY' })
+  @IsOptional()
+  @IsEnum(['PUBLIC', 'PRIVATE', 'UNIVERSITY_ONLY'])
+  visibility?: string;
+
+  @Field(() => Int, { nullable: true, defaultValue: 10 })
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  @Max(50)
+  maxMembers?: number;
+
+  @Field(() => [String], { nullable: true })
+  @IsArray()
+  @IsOptional()
+  tags?: string[];
+
+  @Field(() => [String], { nullable: true })
+  @IsArray()
+  @IsOptional()
+  skills?: string[];
+}
 ```
-
-### 10b. Add to module imports
-
-```typescript
-// FIND the @Module decorator:
-@Module({
-  imports: [DatabaseModule, ContextModule, NotificationModule],
-  providers: [BookmarksService, BookmarksResolver],
-  exports: [BookmarksService],
-})
-
-// REPLACE imports array with:
-imports: [
-  DatabaseModule,
-  ContextModule,
-  NotificationModule,
-  ProjectsModule,  // ← ADD this line
-],
-```
-
-**Verify:** Run `pnpm build` - should compile without errors. BookmarksService can now inject ProjectsService.
 
 ---
 
-## Verification Checklist
+### **File 2:** `src/modules/teams/dto/update-team.dto.ts`
 
-After completing all 10 tasks, verify:
+```typescript
+import { InputType, PartialType, Field } from '@nestjs/graphql';
+import { CreateTeamDto } from './create-team.dto';
+import { IsOptional, IsEnum } from 'class-validator';
 
-```bash
-# 1. Build compiles
-pnpm build
-
-# 2. Tests pass
-pnpm test src/modules/bookmarks
-
-# 3. Check database schema
-# Both tables should have university_id column:
-# - bookmarks
-# - projects
-
-# 4. Search for anti-patterns
-# Should return 0 results:
-grep -r "getUserId()" src/modules/bookmarks/
-grep -r "from(projects)" src/modules/bookmarks/bookmarks.service.ts
+@InputType()
+export class UpdateTeamDto extends PartialType(CreateTeamDto) {
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsEnum(['ACTIVE', 'INACTIVE', 'COMPLETED', 'DISBANDED'])
+  status?: string;
+}
 ```
 
-**Success criteria:**
+---
 
-- ✅ Build passes
-- ✅ Tests pass
-- ✅ No direct `projects` table access in BookmarksService
-- ✅ All queries filter by `universityId`
-- ✅ ProjectsService injected and used
+### **File 3:** `src/modules/teams/dto/filter-teams.dto.ts`
 
-**You're now ready to restructure to Core + Domain pattern!**
+```typescript
+import { InputType, Field, Int, ID } from '@nestjs/graphql';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsInt,
+  Min,
+  Max,
+  IsUUID,
+} from 'class-validator';
+
+@InputType()
+export class FilterTeamsDto {
+  @Field(() => Int, { nullable: true, defaultValue: 1 })
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  page?: number = 1;
+
+  @Field(() => Int, { nullable: true, defaultValue: 10 })
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  @Max(50)
+  limit?: number = 10;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  search?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsEnum(['ACTIVE', 'INACTIVE', 'COMPLETED', 'DISBANDED'])
+  status?: string;
+
+  @Field(() => ID, { nullable: true })
+  @IsUUID()
+  @IsOptional()
+  projectId?: string;
+
+  @Field(() => ID, { nullable: true })
+  @IsUUID()
+  @IsOptional()
+  supervisorId?: string;
+
+  @Field({ nullable: true, defaultValue: 'createdAt' })
+  @IsString()
+  @IsOptional()
+  sortBy?: string = 'createdAt';
+
+  @Field({ nullable: true, defaultValue: 'desc' })
+  @IsOptional()
+  @IsEnum(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc' = 'desc';
+}
+```
+
+---
+
+### **File 4:** `src/modules/teams/dto/add-member.dto.ts`
+
+```typescript
+import { InputType, Field, ID } from '@nestjs/graphql';
+import {
+  IsUUID,
+  IsNotEmpty,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
+
+@InputType()
+export class AddMemberDto {
+  @Field(() => ID)
+  @IsUUID()
+  @IsNotEmpty()
+  userId: string;
+
+  @Field({ nullable: true, defaultValue: 'MEMBER' })
+  @IsOptional()
+  @IsEnum(['LEAD', 'MEMBER', 'OBSERVER'])
+  role?: string;
+
+  @Field({ nullable: true, defaultValue: false })
+  @IsBoolean()
+  @IsOptional()
+  canInviteMembers?: boolean;
+
+  @Field({ nullable: true, defaultValue: false })
+  @IsBoolean()
+  @IsOptional()
+  canEditTeam?: boolean;
+
+  @Field({ nullable: true, defaultValue: false })
+  @IsBoolean()
+  @IsOptional()
+  canMessageClient?: boolean;
+}
+```
+
+---
+
+## **Step 12.7: Implement Service (Core CRUD Only)**
+
+**File:** `src/modules/teams/teams.service.ts`
+
+**Action:** Replace entire file with this code:
+
+```typescript
+// ============================================================================
+// TEAMS SERVICE (CORE CRUD)
+// src/modules/teams/teams.service.ts
+// ============================================================================
+
+import { Injectable } from '@nestjs/common';
+import { DatabaseService } from '@database/database.service';
+import {
+  teams,
+  teamAssignments,
+  TeamStatus,
+  TeamVisibility,
+  TeamRole,
+  AssignmentStatus,
+} from './models/team.model';
+import { eq, and, or, ilike, desc, asc, count, isNull } from 'drizzle-orm';
+import { ContextService } from '@modules/shared/context/context.service';
+import { NotificationService } from '@modules/shared/notification/notification.service';
+import { NotificationType } from '@modules/shared/notification/interfaces';
+import { ERROR_CODES } from '@shared/error/constants/error-codes.constant';
+import { AppError } from '@shared/error/classes/app-error.class';
+import { CreateTeamDto } from './dto/create-team.dto';
+import { UpdateTeamDto } from './dto/update-team.dto';
+import { FilterTeamsDto } from './dto/filter-teams.dto';
+import { AddMemberDto } from './dto/add-member.dto';
+
+@Injectable()
+export class TeamsService {
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly contextService: ContextService,
+    private readonly notificationService: NotificationService,
+  ) {}
+
+  /**
+   * Create a new team
+   */
+  async create(dto: CreateTeamDto) {
+    const userId = this.contextService.getUserId();
+    const context = this.contextService.getContext();
+
+    if (!userId) {
+      throw new AppError(
+        ERROR_CODES.UNAUTHORIZED,
+        'User must be authenticated',
+      );
+    }
+
+    if (!context.universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
+      );
+    }
+
+    const [team] = await this.db.db
+      .insert(teams)
+      .values({
+        ...dto,
+        createdBy: userId,
+        universityId: context.universityId,
+        status: 'ACTIVE',
+        visibility: (dto.visibility as TeamVisibility) || 'UNIVERSITY_ONLY',
+        currentMemberCount: 0,
+      })
+      .returning();
+
+    // Auto-add creator as first member (LEAD role)
+    await this.db.db.insert(teamAssignments).values({
+      teamId: team.id,
+      userId,
+      universityId: context.universityId,
+      role: 'LEAD',
+      status: 'ACTIVE',
+      canInviteMembers: true,
+      canEditTeam: true,
+      canMessageClient: true,
+    });
+
+    // Update member count
+    await this.db.db
+      .update(teams)
+      .set({ currentMemberCount: 1 })
+      .where(eq(teams.id, team.id));
+
+    await this.notificationService.push({
+      type: NotificationType.SUCCESS,
+      message: `Team "${team.name}" created successfully`,
+      context: { teamId: team.id },
+    });
+
+    return { ...team, currentMemberCount: 1 };
+  }
+
+  /**
+   * Get all teams with filtering and pagination
+   */
+  async findAll(filters: FilterTeamsDto) {
+    const context = this.contextService.getContext();
+
+    if (!context.universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
+      );
+    }
+
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
+      projectId,
+      supervisorId,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = filters;
+
+    const offset = (page - 1) * limit;
+
+    // Build WHERE conditions
+    const conditions = [eq(teams.universityId, context.universityId)];
+
+    if (search) {
+      conditions.push(
+        or(
+          ilike(teams.name, `%${search}%`),
+          ilike(teams.description ?? '', `%${search}%`),
+        )!,
+      );
+    }
+
+    if (status) {
+      conditions.push(eq(teams.status, status as TeamStatus));
+    }
+
+    if (projectId) {
+      conditions.push(eq(teams.projectId, projectId));
+    }
+
+    if (supervisorId) {
+      conditions.push(eq(teams.supervisorId, supervisorId));
+    }
+
+    const whereClause = and(...conditions);
+
+    // Sorting
+    let orderByClause;
+    if (sortBy === 'createdAt') {
+      orderByClause =
+        sortOrder === 'asc' ? asc(teams.createdAt) : desc(teams.createdAt);
+    } else if (sortBy === 'name') {
+      orderByClause = sortOrder === 'asc' ? asc(teams.name) : desc(teams.name);
+    } else {
+      orderByClause = desc(teams.createdAt);
+    }
+
+    // Execute queries
+    const [items, totalResult] = await Promise.all([
+      this.db.db
+        .select()
+        .from(teams)
+        .where(whereClause)
+        .orderBy(orderByClause)
+        .limit(limit)
+        .offset(offset),
+
+      this.db.db.select({ count: count() }).from(teams).where(whereClause),
+    ]);
+
+    const total = totalResult[0]?.count || 0;
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
+    };
+  }
+
+  /**
+   * Find team by ID (tenant-validated)
+   */
+  async findById(id: string) {
+    const context = this.contextService.getContext();
+
+    if (!context.universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
+      );
+    }
+
+    const [team] = await this.db.db
+      .select()
+      .from(teams)
+      .where(
+        and(eq(teams.id, id), eq(teams.universityId, context.universityId)),
+      )
+      .limit(1);
+
+    if (!team) {
+      throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'Team not found', {
+        teamId: id,
+      });
+    }
+
+    return team;
+  }
+
+  /**
+   * Find teams by student ID (for dashboard)
+   */
+  async findByStudentId(studentId: string) {
+    const context = this.contextService.getContext();
+
+    if (!context.universityId) {
+      throw new AppError(
+        ERROR_CODES.MISSING_CONTEXT,
+        'University context required',
+      );
+    }
+
+    // Find all team assignments for this student
+    const assignments = await this.db.db
+      .select()
+      .from(teamAssignments)
+      .where(
+        and(
+          eq(teamAssignments.userId, studentId),
+          eq(teamAssignments.universityId, context.universityId),
+          eq(teamAssignments.status, 'ACTIVE'),
+        ),
+      );
+
+    if (assignments.length === 0) {
+      return [];
+    }
+
+    const teamIds = assignments.map((a) => a.teamId);
+
+    // Get team details
+    const teamsList = await this.db.db
+      .select()
+      .from(teams)
+      .where(
+        and(
+          eq(teams.universityId, context.universityId),
+          // TODO: Use inArray when you have multiple teams
+          // For now, just return first team
+        ),
+      );
+
+    return teamsList;
+  }
+
+  /**
+   * Update team (ownership check)
+   */
+  async update(id: string, dto: UpdateTeamDto) {
+    const userId = this.contextService.getUserId();
+
+    if (!userId) {
+      throw new AppError(
+        ERROR_CODES.UNAUTHORIZED,
+        'User must be authenticated',
+      );
+    }
+
+    // Verify ownership or lead/supervisor permission
+    const team = await this.findById(id);
+    const canEdit = await this.canUserEditTeam(userId, id);
+
+    if (!canEdit && team.createdBy !== userId) {
+      throw new AppError(
+        ERROR_CODES.INSUFFICIENT_PERMISSIONS,
+        'You do not have permission to edit this team',
+      );
+    }
+
+    const { status, visibility, ...restOfDto } = dto;
+    const updateData: Partial<typeof teams.$inferInsert> = {
+      ...restOfDto,
+      updatedAt: new Date(),
+    };
+
+    if (status) {
+      updateData.status = status as TeamStatus;
+    }
+    if (visibility) {
+      updateData.visibility = visibility as TeamVisibility;
+    }
+
+    const [updated] = await this.db.db
+      .update(teams)
+      .set(updateData)
+      .where(eq(teams.id, id))
+      .returning();
+
+    await this.notificationService.push({
+      type: NotificationType.SUCCESS,
+      message: 'Team updated successfully',
+      context: { teamId: id },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Add member to team
+   */
+  async addMember(teamId: string, dto: AddMemberDto) {
+    const userId = this.contextService.getUserId();
+    const context = this.contextService.getContext();
+
+    if (!userId) {
+      throw new AppError(
+        ERROR_CODES.UNAUTHORIZED,
+        'User must be authenticated',
+      );
+    }
+
+    // Verify team exists and get current state
+    const team = await this.findById(teamId);
+
+    // Check if user can invite members
+    const canInvite = await this.canUserInviteMembers(userId, teamId);
+
+    if (!canInvite && team.createdBy !== userId) {
+      throw new AppError(
+        ERROR_CODES.INSUFFICIENT_PERMISSIONS,
+        'You do not have permission to add members to this team',
+      );
+    }
+
+    // Check team capacity
+    if (team.currentMemberCount >= team.maxMembers) {
+      throw new AppError(
+        ERROR_CODES.OPERATION_NOT_ALLOWED,
+        'Team has reached maximum capacity',
+        { currentCount: team.currentMemberCount, maxMembers: team.maxMembers },
+      );
+    }
+
+    // Check if user
+```
