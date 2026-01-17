@@ -343,7 +343,7 @@ export class ProjectsService {
       this.db.db.select({ count: count() }).from(projects).where(whereClause),
     ]);
 
-    const total = totalResult[0]?.count || 0;
+    const total = Number(totalResult[0]?.count || 0);
     const totalPages = Math.ceil(total / limit);
 
     return {
@@ -877,7 +877,7 @@ export class ProjectsService {
         .where(eq(projects.clientId, client.id)),
     ]);
 
-    const total = totalResult[0]?.count || 0;
+    const total = Number(totalResult[0]?.count || 0);
     const totalPages = Math.ceil(total / limit);
 
     return {

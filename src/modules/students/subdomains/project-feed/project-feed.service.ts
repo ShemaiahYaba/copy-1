@@ -126,7 +126,7 @@ export class ProjectFeedService {
     const endCursor =
       cards.length > 0 ? cards[cards.length - 1].postedAt : undefined;
 
-    return {
+    const returnValue = {
       cards: cards ?? [],
       filtersMeta: {
         availableCategories,
@@ -134,11 +134,24 @@ export class ProjectFeedService {
         defaultSort: 'MATCH_SCORE',
       },
       pageInfo: {
-        hasNextPage: projectsResult.hasNextPage,
-        endCursor,
+        hasNextPage: projectsResult.hasNextPage ?? false,
+        endCursor: endCursor ?? undefined,
       },
-      total: projectsResult.total ?? 0,
+      total:
+        typeof projectsResult.total === 'number'
+          ? projectsResult.total
+          : Number(projectsResult.total ?? 0),
     };
+
+    console.log('SERVICE_DEBUG', {
+      totalFromDB: projectsResult.total,
+      totalType: typeof projectsResult.total,
+      finalTotal: returnValue.total,
+      finalTotalType: typeof returnValue.total,
+      cardsCount: returnValue.cards.length,
+    });
+
+    return returnValue;
   }
 
   /**
