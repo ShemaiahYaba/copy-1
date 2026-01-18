@@ -275,6 +275,114 @@ type PaginatedBookmarksResponse {
   hasPreviousPage: Boolean!
 }
 
+type ExperienceCardEntity {
+  id: ID!
+  title: String!
+  courseCode: String
+  university: String!
+  summary: String!
+  skills: [String!]!
+  status: String!
+  startDate: String!
+  endDate: String!
+  matchesCount: Int!
+  tags: [String!]!
+}
+
+type ExperienceRowEntity {
+  id: ID!
+  name: String!
+  status: String!
+  createdBy: String!
+  createdAt: String!
+  endDate: String
+  matchesUrl: String!
+}
+
+type ExperienceDurationEntity {
+  start: String!
+  end: String!
+  weeks: Int!
+}
+
+type ExperienceLearnerEntity {
+  label: String!
+  value: String!
+}
+
+type StudentExperienceCompanyPreferences {
+  location: String
+  industry: [String!]
+}
+
+type ExperienceRequirementsEntity {
+  companyPreferences: StudentExperienceCompanyPreferences
+  prerequisites: [String!]
+}
+
+type StudentExperienceContact {
+  name: String!
+  role: String!
+  email: String!
+  institution: String!
+  location: String!
+}
+
+type ExperienceMemberEntity {
+  id: ID!
+  userId: ID!
+  name: String!
+  email: String!
+  role: String!
+  status: String!
+  joinedAt: String!
+}
+
+type ExperienceInstitutionEntity {
+  name: String!
+  department: String!
+  location: String!
+  description: String!
+}
+
+type RecommendedProjectCardEntity {
+  id: ID!
+  title: String!
+  organization: String!
+  summary: String
+  skills: [String!]!
+  difficulty: String!
+}
+
+type ExperienceDetailEntity {
+  id: ID!
+  title: String!
+  courseCode: String
+  duration: ExperienceDurationEntity!
+  tags: [String!]!
+  status: String!
+  overview: String!
+  learners: [ExperienceLearnerEntity!]!
+  requirements: ExperienceRequirementsEntity!
+  expectedOutcomes: [String!]!
+  projectExamples: [String!]!
+  mainContact: StudentExperienceContact!
+  members: [ExperienceMemberEntity!]!
+  recommendedProjects: [RecommendedProjectCardEntity!]!
+  institution: ExperienceInstitutionEntity!
+}
+
+type StudentPaginatedExperiencesResponse {
+  cards: [ExperienceCardEntity!]
+  rows: [ExperienceRowEntity!]
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
 type Query {
   projects(filters: FilterProjectsDto!): PaginatedProjectsResponse!
   project(id: ID!): ProjectEntity!
@@ -290,6 +398,8 @@ type Query {
   studentBookmark(id: ID!): BookmarkEntity!
   searchBookmarks(term: String!): [ID!]!
   studentBookmarkCount: Float!
+  studentExperiences(filters: StudentExperienceFiltersDto): StudentPaginatedExperiencesResponse!
+  studentExperienceDetail(id: ID!): ExperienceDetailEntity!
 }
 
 input FilterProjectsDto {
@@ -347,6 +457,17 @@ input FilterBookmarksDto {
   sortOrder: String = "desc"
 }
 
+input StudentExperienceFiltersDto {
+  page: Int = 1
+  limit: Int = 10
+  search: String
+  filter: String = "CREATED"
+  view: String = "GRID"
+  status: String
+  sortBy: String = "createdAt"
+  sortOrder: String = "desc"
+}
+
 type Mutation {
   createProject(input: CreateProjectDto!): ProjectEntity!
   updateProject(id: ID!, input: UpdateProjectDto!): ProjectEntity!
@@ -368,6 +489,11 @@ type Mutation {
   removeBookmark(id: ID!): Boolean!
   removeBookmarkByProject(projectId: ID!): Boolean!
   bulkDeleteBookmarks(input: BulkDeleteBookmarksDto!): Boolean!
+  createStudentExperience(input: CreateExperienceDto!): ExperienceDetailEntity!
+  updateStudentExperience(id: ID!, input: UpdateExperienceDto!): ExperienceDetailEntity!
+  publishStudentExperience(id: ID!): ExperienceDetailEntity!
+  archiveStudentExperience(id: ID!): ExperienceDetailEntity!
+  deleteStudentExperience(id: ID!): Boolean!
 }
 
 input CreateProjectDto {

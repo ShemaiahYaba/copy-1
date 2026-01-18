@@ -98,16 +98,7 @@ export class ExperienceLearnerEntity {
   value: string;
 }
 
-@ObjectType()
-export class ExperienceRequirementsEntity {
-  @Field(() => ExperienceCompanyPreferencesEntity, { nullable: true })
-  companyPreferences?: ExperienceCompanyPreferencesEntity;
-
-  @Field(() => [String], { nullable: true })
-  prerequisites?: string[];
-}
-
-@ObjectType()
+@ObjectType('StudentExperienceCompanyPreferences')
 export class ExperienceCompanyPreferencesEntity {
   @Field({ nullable: true })
   location?: string;
@@ -117,6 +108,15 @@ export class ExperienceCompanyPreferencesEntity {
 }
 
 @ObjectType()
+export class ExperienceRequirementsEntity {
+  @Field(() => ExperienceCompanyPreferencesEntity, { nullable: true })
+  companyPreferences?: ExperienceCompanyPreferencesEntity;
+
+  @Field(() => [String], { nullable: true })
+  prerequisites?: string[];
+}
+
+@ObjectType('StudentExperienceContact')
 export class ExperienceContactEntity {
   @Field()
   name: string;
@@ -246,7 +246,7 @@ export class ExperienceDetailEntity {
 // PAGINATED RESPONSE
 // ============================================================================
 
-@ObjectType()
+@ObjectType('StudentPaginatedExperiencesResponse')
 export class PaginatedExperiencesResponse {
   @Field(() => [ExperienceCardEntity], { nullable: true })
   cards?: ExperienceCardEntity[];
