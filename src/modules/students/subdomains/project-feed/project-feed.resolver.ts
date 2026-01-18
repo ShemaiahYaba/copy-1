@@ -23,13 +23,7 @@ export class ProjectFeedResolver {
     @Args('filters', { nullable: true }) filters: ProjectFeedFiltersDto,
     @CurrentUser() _user: User, // eslint-disable-line @typescript-eslint/no-unused-vars
   ) {
-    const result = await this.projectFeedService.getProjectFeed(filters || {});
-    console.log('RESOLVER_DEBUG', {
-      totalType: typeof result.total,
-      totalValue: result.total,
-      hasCards: result.cards.length > 0,
-    });
-    return result;
+    return this.projectFeedService.getProjectFeed(filters || {});
   }
 
   @Query(() => [ID], { name: 'searchProjectFeed' })

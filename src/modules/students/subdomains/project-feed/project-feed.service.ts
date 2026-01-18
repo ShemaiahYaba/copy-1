@@ -143,14 +143,6 @@ export class ProjectFeedService {
           : Number(projectsResult.total ?? 0),
     };
 
-    console.log('SERVICE_DEBUG', {
-      totalFromDB: projectsResult.total,
-      totalType: typeof projectsResult.total,
-      finalTotal: returnValue.total,
-      finalTotalType: typeof returnValue.total,
-      cardsCount: returnValue.cards.length,
-    });
-
     return returnValue;
   }
 

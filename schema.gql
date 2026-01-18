@@ -72,52 +72,10 @@ type ProjectLearnerRequirementEntity {
   level: String!
 }
 
-type ProjectPageInfo {
-  hasNextPage: Boolean!
-  endCursor: String
-}
-
-type ProjectFiltersMetaEntity {
-  availableCategories: [String!]!
-  availableSkills: [String!]!
-  defaultSort: String!
-}
-
-type ProjectCardEntity {
-  id: ID!
-  title: String!
-  organization: String
-  organizationLogoUrl: String
-  summary: String!
-  skills: [String!]!
-  difficulty: String
-  category: String!
-  tags: [String!]!
-  matchScore: Float
-  postedAt: DateTime!
-  timeRemaining: String
-}
-
 type ProjectContactEntity {
   name: String!
   role: String
   email: String
-}
-
-type ProjectCompanyEntity {
-  name: String
-  location: String
-  overview: String
-}
-
-type StudentProjectFeedResponse {
-  cards: [ProjectCardEntity!]!
-  filtersMeta: ProjectFiltersMetaEntity!
-  pageInfo: ProjectPageInfo!
-}
-
-type StudentProjectFeedSearchResult {
-  cardIds: [ID!]!
 }
 
 type ExperienceLearnerRequirementEntity {
@@ -319,8 +277,6 @@ type PaginatedBookmarksResponse {
 
 type Query {
   projects(filters: FilterProjectsDto!): PaginatedProjectsResponse!
-  studentProjectFeedCursor(studentId: ID!, filters: ProjectFeedFilterInput, pagination: CursorPaginationInput): StudentProjectFeedResponse!
-  studentProjectFeedSearch(studentId: ID!, term: String!): StudentProjectFeedSearchResult!
   project(id: ID!): ProjectEntity!
   myProjects(filters: FilterProjectsDto!): PaginatedProjectsResponse!
   experiences(filters: FilterExperiencesDto!): PaginatedExperiencesResponse!
@@ -351,18 +307,6 @@ input FilterProjectsDto {
   isAvailable: Boolean
   sortBy: String = "createdAt"
   sortOrder: String = "desc"
-}
-
-input ProjectFeedFilterInput {
-  search: String
-  categories: [String!]
-  skills: [String!]
-  sort: String = "MATCH_SCORE"
-}
-
-input CursorPaginationInput {
-  cursor: String
-  limit: Int = 9
 }
 
 input FilterExperiencesDto {

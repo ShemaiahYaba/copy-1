@@ -1,6 +1,6 @@
 # Projects Module
 
-Production-grade projects management for NestJS using Drizzle ORM + GraphQL. Includes client project publishing, student discovery feed, and shared integrations with Auth, Context, Notification, and Error modules. All reads/writes are tenant-aware via `universityId`.
+Production-grade projects management for NestJS using Drizzle ORM + GraphQL. Includes client project publishing and shared integrations with Auth, Context, Notification, and Error modules. All reads/writes are tenant-aware via `universityId`.
 
 ## 📋 Table of Contents
 
@@ -11,7 +11,6 @@ Production-grade projects management for NestJS using Drizzle ORM + GraphQL. Inc
 - [🧩 DTOs](#-dtos)
 - [🧭 GraphQL API](#-graphql-api)
 - [📌 Workflows](#-workflows)
-- [🧠 Business Rules (Student Feed)](#-business-rules-student-feed)
 - [🔒 Auth & Guards](#-auth--guards)
 - [⚙️ Setup](#️-setup)
 - [🧪 Testing](#-testing)
@@ -23,9 +22,6 @@ Production-grade projects management for NestJS using Drizzle ORM + GraphQL. Inc
 
 - Client project lifecycle: create, update, approve, publish, delete.
 - Categorization, skills, difficulty, visibility, confidentiality, and metadata.
-- Cursor-based student discovery feed with search, filters, and category/skill meta.
-- Feed search endpoint for client-side highlighting.
-- Project detail fields for cards and drawer overlays (organization, contacts, outcomes, resources).
 - Notification hooks for key events (create, update, publish, delete, assign).
 - Type-safe DTO validation and enum mappings.
 
@@ -35,8 +31,8 @@ Production-grade projects management for NestJS using Drizzle ORM + GraphQL. Inc
 
 ```bash
 projects/
-├── dto/                 # GraphQL input DTOs (create, update, filters, feed)
-├── entities/            # GraphQL output types (Project, card, feed meta, page info)
+├── dto/                 # GraphQL input DTOs (create, update, filters)
+├── entities/            # GraphQL output types (Project, pagination)
 ├── models/              # Drizzle schema & enums
 ├── projects.resolver.ts # GraphQL resolvers
 └── projects.service.ts  # Business logic & persistence
@@ -90,8 +86,6 @@ Indexes exist on client, status, category, published, assigned, createdAt.
 - `CreateProjectDto`: full project authoring with validation, length checks, enums, nested contacts/learner requirements.
 - `UpdateProjectDto`: partial updates + status override + assignedTeamId.
 - `FilterProjectsDto`: page/limit, search, status/approval/category, skills/tags, remote/published/available, sort fields.
-- `ProjectFeedFilterInput`: search, categories[], skills[], sort (MATCH_SCORE|NEWEST_FIRST|OLDEST_FIRST|DEADLINE_SOON).
-- `CursorPaginationInput`: cursor, limit (default 9).
 
 ---
 
@@ -101,8 +95,6 @@ Queries:
 
 - `projects(filters: FilterProjectsDto!): PaginatedProjectsResponse`
 - `project(id: ID!): ProjectEntity`
-- `studentProjectFeed(studentId: ID!, filters?: ProjectFeedFilterInput, pagination?: CursorPaginationInput): StudentProjectFeedResponse`
-- `studentProjectFeedSearch(studentId: ID!, term: String!): StudentProjectFeedSearchResult`
 
 Mutations (client role):
 
@@ -116,14 +108,10 @@ Mutations (client role):
 Key response types:
 
 - `ProjectEntity`: full project fields
-- `ProjectCardEntity`: id, title, organization/logo, summary, skills, difficulty, category, tags (with +N overflow), postedAt, timeRemaining, matchScore (placeholder)
-- `ProjectFiltersMetaEntity`: availableCategories, availableSkills, defaultSort
-- `ProjectPageInfo`: hasNextPage, endCursor
 
 Pagination:
 
 - Admin/list: page/limit with totals.
-- Student feed: cursor-based (`createdAt`), limit+1 pattern, `endCursor` + `hasNextPage`.
 
 ---
 
@@ -146,7 +134,6 @@ Pagination:
 - Delete Project
   - Ownership check, blocked if assigned to team
 
-- Student Feed
   - Filters: search (title/org/desc), categories, skills (JSON contains), sort options
   - Only published + approved
   - Cursor pagination by createdAt
@@ -156,7 +143,6 @@ Pagination:
 
 ---
 
-## 🧠 Business Rules (Student Feed)
 
 - Access: authenticated students; visibility PUBLIC or university-restricted (future guard).
 - Sorting: default MATCH_SCORE (placeholder), supports Newest, Oldest, Deadline Soon (requires deadline).

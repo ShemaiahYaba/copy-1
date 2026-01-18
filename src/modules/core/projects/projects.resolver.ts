@@ -12,16 +12,10 @@ import { ProjectsService } from './projects.service';
 import {
   ProjectEntity,
   PaginatedProjectsResponse,
-  StudentProjectFeedResponse,
-  StudentProjectFeedSearchResult,
 } from './entities/project.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { FilterProjectsDto } from './dto/filter-projects.dto';
-import {
-  CursorPaginationInput,
-  ProjectFeedFilterInput,
-} from './dto/student-feed.dto';
 
 @Resolver(() => ProjectEntity)
 export class ProjectsResolver {
@@ -40,35 +34,6 @@ export class ProjectsResolver {
   @Query(() => PaginatedProjectsResponse, { name: 'projects' })
   async getProjects(@Args('filters') filters: FilterProjectsDto) {
     return this.projectsService.findAll(filters);
-  }
-
-  @Query(() => StudentProjectFeedResponse, { name: 'studentProjectFeedCursor' })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('student')
-  async studentProjectFeed(
-    @Args('studentId', { type: () => ID }) studentId: string,
-    @Args('filters', { nullable: true }) filters: ProjectFeedFilterInput,
-    @Args('pagination', { nullable: true }) pagination: CursorPaginationInput,
-    @CurrentUser() _user: User, // eslint-disable-line @typescript-eslint/no-unused-vars
-  ) {
-    return this.projectsService.studentProjectFeed(
-      studentId,
-      filters,
-      pagination,
-    );
-  }
-
-  @Query(() => StudentProjectFeedSearchResult, {
-    name: 'studentProjectFeedSearch',
-  })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('student')
-  async studentProjectFeedSearch(
-    @Args('studentId', { type: () => ID }) studentId: string,
-    @Args('term') term: string,
-    @CurrentUser() _user: User, // eslint-disable-line @typescript-eslint/no-unused-vars
-  ) {
-    return this.projectsService.studentProjectFeedSearch(studentId, term);
   }
 
   @Query(() => ProjectEntity, { name: 'project' })

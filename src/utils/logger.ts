@@ -10,6 +10,7 @@ export async function logStartupInfo(app: INestApplication): Promise<void> {
   console.log(' ============================================');
   console.log('');
   console.log(`📍 Server URL:        ${appUrl}`);
+  console.log(`📚 GraphQL Playground:      ${appUrl}/graphql`);
   console.log(`📚 Swagger Docs:      ${appUrl}/api/docs`);
   console.log(`📄 OpenAPI JSON:      ${appUrl}/api/docs-json`);
   console.log(`🌍 Environment:       ${EnvironmentConfig.getNodeEnv()}`); // Use getter
