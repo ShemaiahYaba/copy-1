@@ -1,14 +1,14 @@
 // ============================================================================
+// FIXED: Roles Guard - Works with BOTH GraphQL and HTTP
 // src/modules/core/auth/guards/roles.guard.ts
-// Type-Safe Role-Based Access Control Guard
-// ✅ NOW RESPECTS @Public() DECORATOR
 // ============================================================================
 
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { GqlExecutionContext } from '@nestjs/graphql';
 import { Request } from 'express';
 import { ROLES_KEY } from '../decorators/roles.decorator';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator'; // ✅ IMPORT THIS
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { UserRole } from '../models/user.model';
 import { ERROR_CODES } from '@shared/error/constants/error-codes.constant';
 import { AppError } from '@shared/error/classes/app-error.class';
@@ -26,30 +26,29 @@ export class RolesGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    // ✅ CRITICAL FIX: Check if route is public FIRST
+    // Check if route is public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
     if (isPublic) {
-      // Route is public - skip role check entirely
       return true;
     }
 
-    // 1. Get required roles from @Roles() decorator
+    // Get required roles from @Roles() decorator
     const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );
 
-    // 2. No roles required - allow access
+    // No roles required - allow access
     if (!requiredRoles || requiredRoles.length === 0) {
       return true;
     }
 
-    // 3. Get user from request (attached by JwtAuthGuard)
-    const request = context.switchToHttp().getRequest<Request>();
+    // ✅ FIX: Get request from EITHER HTTP or GraphQL context
+    const request = this.getRequest(context);
     const user = request.user;
 
     if (!user) {
@@ -57,7 +56,7 @@ export class RolesGuard implements CanActivate {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, 'User not authenticated');
     }
 
-    // 4. Check if user has required role
+    // Check if user has required role
     const hasRole = requiredRoles.includes(user.role);
 
     if (!hasRole) {
@@ -65,7 +64,6 @@ export class RolesGuard implements CanActivate {
         `Access denied: User ${user.email} (${user.role}) attempted to access route requiring [${requiredRoles.join(', ')}]`,
       );
 
-      // Send notification for forbidden access
       this.notificationService
         .push({
           type: NotificationType.ERROR,
@@ -76,9 +74,7 @@ export class RolesGuard implements CanActivate {
             requiredRoles,
           },
         })
-        .catch(() => {
-          // Ignore notification errors
-        });
+        .catch(() => {});
 
       throw new AppError(
         ERROR_CODES.INSUFFICIENT_PERMISSIONS,
@@ -94,5 +90,20 @@ export class RolesGuard implements CanActivate {
       `Access granted: User ${user.email} (${user.role}) has required role`,
     );
     return true;
+  }
+
+  /**
+   * ✅ NEW: Extract request from EITHER HTTP or GraphQL context
+   */
+  private getRequest(context: ExecutionContext): Request {
+    const contextType = context.getType<string>();
+
+    if (contextType === 'graphql') {
+      const gqlContext = GqlExecutionContext.create(context);
+      const ctx = gqlContext.getContext<{ req: Request }>();
+      return ctx.req;
+    }
+
+    return context.switchToHttp().getRequest<Request>();
   }
 }

@@ -1,6 +1,6 @@
 // ============================================================================
+// PRODUCTION-READY: JWT Auth Guard - Works with BOTH GraphQL and HTTP
 // src/modules/core/auth/guards/jwt-auth.guard.ts
-// Type-Safe JWT Guard - No Passport Required - DEBUG VERSION
 // ============================================================================
 
 import {
@@ -11,6 +11,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { GqlExecutionContext } from '@nestjs/graphql';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { SupabaseService } from '../services/supabase.service';
@@ -40,7 +41,9 @@ export class JwtAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const handler = context.getHandler();
     const controller = context.getClass();
-    const request = context.switchToHttp().getRequest<Request>();
+
+    // ✅ FIX 1: Get request from EITHER HTTP or GraphQL context
+    const request = this.getRequest(context);
 
     this.logger.debug(
       `JwtAuthGuard checking: ${controller.name} -> ${handler.name} (Path: ${request.url})`,
@@ -48,8 +51,8 @@ export class JwtAuthGuard implements CanActivate {
 
     // 1. Check if route is marked as @Public()
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      handler, // context.getHandler()
-      controller, // context.getClass()
+      handler,
+      controller,
     ]);
 
     this.logger.debug(
@@ -97,11 +100,10 @@ export class JwtAuthGuard implements CanActivate {
     } catch (error) {
       this.logger.error('Authentication failed:', error);
 
-      // Type-safe error handling
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
 
-      // Send notification (optional - only if not too noisy)
+      // Send notification (optional)
       this.notificationService
         .push({
           type: NotificationType.ERROR,
@@ -109,7 +111,7 @@ export class JwtAuthGuard implements CanActivate {
           context: { reason: errorMessage },
         })
         .catch(() => {
-          // Ignore notification errors - don't let them break auth
+          // Ignore notification errors
         });
 
       if (error instanceof UnauthorizedException) {
@@ -118,6 +120,25 @@ export class JwtAuthGuard implements CanActivate {
 
       throw new UnauthorizedException('Invalid or expired token');
     }
+  }
+
+  /**
+   * ✅ FIX 2: Extract request from EITHER HTTP or GraphQL context
+   * This is the CRITICAL method that was missing GraphQL support
+   */
+  private getRequest(context: ExecutionContext): Request {
+    // Check if this is a GraphQL request
+    const contextType = context.getType<string>();
+
+    if (contextType === 'graphql') {
+      // GraphQL request - get request from GQL context
+      const gqlContext = GqlExecutionContext.create(context);
+      const ctx = gqlContext.getContext<{ req: Request }>();
+      return ctx.req;
+    }
+
+    // HTTP request - standard approach
+    return context.switchToHttp().getRequest<Request>();
   }
 
   /**
