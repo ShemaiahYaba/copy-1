@@ -9,6 +9,7 @@ import { StudentsResolver } from './students.resolver';
 import { ContextModule } from '@modules/shared/context/context.module';
 import { ProjectFeedModule } from './subdomains/project-feed/project-feed.module';
 import { StudentBookmarksModule } from './subdomains/bookmarks/bookmarks.module';
+import { StudentExperiencesModule } from './subdomains/experiences/experiences.module';
 import { NotificationModule } from '@modules/shared/notification/notification.module';
 import { NotificationAdapter } from '@modules/shared/notification/dto';
 import { AuthModule } from '@modules/core/auth/auth.module';
@@ -19,6 +20,7 @@ import { AuthModule } from '@modules/core/auth/auth.module';
     AuthModule,
     ProjectFeedModule,
     StudentBookmarksModule,
+    StudentExperiencesModule,
     NotificationModule.register({
       adapter: NotificationAdapter.WEBSOCKET,
       persist: false,
