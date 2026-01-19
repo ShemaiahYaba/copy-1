@@ -3,8 +3,6 @@ import { APP_FILTER } from '@nestjs/core';
 import { ErrorConfigDto } from './dto/error-config.dto';
 import { ErrorService } from './error.service';
 import { AppErrorFilter } from './filters/app-error/app-error.filter';
-import { NotificationModule } from '../notification/notification.module';
-import { NotificationAdapter } from '../notification/dto';
 
 @Global()
 @Module({})
@@ -14,13 +12,7 @@ export class ErrorModule {
 
     return {
       module: ErrorModule,
-      imports: [
-        NotificationModule.register({
-          adapter: NotificationAdapter.WEBSOCKET,
-          persist: false,
-          enableLogging: false,
-        }),
-      ],
+      imports: [],
       providers: [
         ErrorService,
         {

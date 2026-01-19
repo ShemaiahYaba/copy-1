@@ -383,6 +383,84 @@ type StudentPaginatedExperiencesResponse {
   hasPreviousPage: Boolean!
 }
 
+type DashboardHeaderEntity {
+  greeting: String!
+  lastLoginAt: String
+  hasMatches: Boolean!
+}
+
+type DashboardTaskEntity {
+  id: ID!
+  title: String!
+  projectId: ID!
+  projectName: String!
+  status: String!
+  dueAt: String!
+  isOverdue: Boolean!
+}
+
+type DashboardProjectEntity {
+  id: ID!
+  name: String!
+  companyName: String!
+  status: String!
+  lastUpdatedAt: String!
+  matchScore: Float
+}
+
+type DashboardExperienceEntity {
+  id: ID!
+  title: String!
+  status: String!
+  lastEditedAt: String!
+}
+
+type DashboardTeamEntity {
+  id: ID!
+  name: String!
+  role: String!
+  avatarUrls: [String!]!
+  unreadThreadCount: Int!
+}
+
+type DashboardSuggestionEntity {
+  projectId: ID!
+  projectName: String!
+  reason: String!
+  matchScore: Float!
+  actionRequired: Boolean!
+}
+
+type DashboardNotificationEntity {
+  id: ID!
+  type: String!
+  message: String!
+  createdAt: String!
+}
+
+type DashboardNotificationsEntity {
+  unreadCount: Int!
+  latest: [DashboardNotificationEntity!]!
+}
+
+type DashboardCountsEntity {
+  tasksCount: Int!
+  projectsCount: Int!
+  experiencesCount: Int!
+  teamsCount: Int!
+}
+
+type StudentDashboardEntity {
+  header: DashboardHeaderEntity!
+  tasks: [DashboardTaskEntity!]!
+  projects: [DashboardProjectEntity!]!
+  experiences: [DashboardExperienceEntity!]!
+  teams: [DashboardTeamEntity!]!
+  suggestions: [DashboardSuggestionEntity!]!
+  notifications: DashboardNotificationsEntity!
+  counts: DashboardCountsEntity!
+}
+
 type Query {
   projects(filters: FilterProjectsDto!): PaginatedProjectsResponse!
   project(id: ID!): ProjectEntity!
@@ -400,6 +478,7 @@ type Query {
   studentBookmarkCount: Float!
   studentExperiences(filters: StudentExperienceFiltersDto): StudentPaginatedExperiencesResponse!
   studentExperienceDetail(id: ID!): ExperienceDetailEntity!
+  studentDashboard(filters: DashboardFiltersDto): StudentDashboardEntity!
 }
 
 input FilterProjectsDto {
@@ -466,6 +545,12 @@ input StudentExperienceFiltersDto {
   status: String
   sortBy: String = "createdAt"
   sortOrder: String = "desc"
+}
+
+input DashboardFiltersDto {
+  taskStatus: String = "ONGOING"
+  projectStatus: String = "ONGOING"
+  experienceStatus: String = "PUBLISHED"
 }
 
 type Mutation {

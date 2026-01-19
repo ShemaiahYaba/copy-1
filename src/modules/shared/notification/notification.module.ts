@@ -1,26 +1,32 @@
 // src/modules/notification/notification.module.ts
 
-import { Module, DynamicModule } from '@nestjs/common';
+import { Module, DynamicModule, type Provider } from '@nestjs/common';
 import { NotificationService } from './notification.service';
 import { NotificationGateway } from './notification.gateway';
 import { NotificationConfigDto } from './dto';
 
 @Module({})
 export class NotificationModule {
+  private static initialized = false;
+
   static register(config?: NotificationConfigDto): DynamicModule {
-    // Use provided config or default
     const notificationConfig = config || new NotificationConfigDto();
+    const providers: Provider[] = [
+      {
+        provide: 'NOTIFICATION_CONFIG',
+        useValue: notificationConfig,
+      },
+      NotificationService,
+    ];
+
+    if (!NotificationModule.initialized) {
+      providers.push(NotificationGateway);
+      NotificationModule.initialized = true;
+    }
 
     return {
       module: NotificationModule,
-      providers: [
-        {
-          provide: 'NOTIFICATION_CONFIG',
-          useValue: notificationConfig,
-        },
-        NotificationService,
-        NotificationGateway,
-      ],
+      providers,
       exports: [NotificationService],
     };
   }

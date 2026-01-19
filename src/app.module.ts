@@ -46,8 +46,8 @@ dotenv.config();
       context: (ctx: { req: Request }) => ({ req: ctx.req }),
     }),
 
-    // 2. Notification Module (ErrorModule depends on it)
-    NotificationModule.register({
+    // 2. Notification Module (global singleton)
+    NotificationModule.forRoot({
       adapter: NotificationAdapter.WEBSOCKET,
       persist: true,
       enableLogging: process.env.NODE_ENV === 'development',

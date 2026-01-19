@@ -20,13 +20,11 @@ import { RolesGuard } from './guards/roles.guard';
 // Module Imports
 import { DatabaseModule } from '@database/database.module';
 import { ContextModule } from '@shared/context/context.module';
-import { NotificationModule } from '@shared/notification/notification.module';
 
 @Module({
   imports: [
     DatabaseModule,
     ContextModule.register(),
-    NotificationModule.register(),
   ],
   controllers: [AuthController],
   providers: [
