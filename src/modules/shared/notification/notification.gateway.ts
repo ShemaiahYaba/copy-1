@@ -35,18 +35,11 @@ export class NotificationGateway
     process.env.TEST_SOCKET_TIMEOUT || '5000',
     10,
   );
-  private static subscribed = false;
 
   constructor(private readonly notificationService: NotificationService) {}
 
   /** Gateway initialization */
   afterInit(server: Server): void {
-    if (NotificationGateway.subscribed) {
-      this.logger.warn('Notification gateway already subscribed, skipping.');
-      return;
-    }
-    NotificationGateway.subscribed = true;
-
     this.logger.log(
       `WebSocket Gateway initialized on /notify namespace` +
         `${this.isTestMode ? ' [TEST MODE]' : ''}`,
@@ -122,10 +115,6 @@ export class NotificationGateway
     this.logger.log(
       `Client disconnected: ${client.id} (Total: ${this.activeConnections})`,
     );
-
-    // Clean up event listeners to prevent memory leaks
-    client.removeAllListeners('join-room');
-    client.removeAllListeners('leave-room');
   }
 
   /**
